@@ -7,6 +7,8 @@
     <title>中医古籍典藏 - TCM Ancient Books Collection</title>
     <link href="https://fonts.googleapis.cnpmjs.org/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+    <!-- 农历库 -->
+    <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.2.0/lunar.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -2115,44 +2117,75 @@
             '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'
         ];
         
-        // 二十四节气（按公历月份排序）
-        const solarTerms = [
-            { name: '小寒', month: 1, day: 5 },
-            { name: '大寒', month: 1, day: 20 },
-            { name: '立春', month: 2, day: 4 },
-            { name: '雨水', month: 2, day: 19 },
-            { name: '惊蛰', month: 3, day: 5 },
-            { name: '春分', month: 3, day: 20 },
-            { name: '清明', month: 4, day: 4 },
-            { name: '谷雨', month: 4, day: 20 },
-            { name: '立夏', month: 5, day: 5 },
-            { name: '小满', month: 5, day: 21 },
-            { name: '芒种', month: 6, day: 5 },
-            { name: '夏至', month: 6, day: 21 },
-            { name: '小暑', month: 7, day: 7 },
-            { name: '大暑', month: 7, day: 22 },
-            { name: '立秋', month: 8, day: 7 },
-            { name: '处暑', month: 8, day: 23 },
-            { name: '白露', month: 9, day: 7 },
-            { name: '秋分', month: 9, day: 23 },
-            { name: '寒露', month: 10, day: 8 },
-            { name: '霜降', month: 10, day: 23 },
-            { name: '立冬', month: 11, day: 7 },
-            { name: '小雪', month: 11, day: 22 },
-            { name: '大雪', month: 12, day: 7 },
-            { name: '冬至', month: 12, day: 22 }
-        ];
+        // 二十四节气数据（2025-2026年精确时间）
+        const solarTermData = {
+            2025: [
+                {name: '小寒', month: 1, day: 5},
+                {name: '大寒', month: 1, day: 20},
+                {name: '立春', month: 2, day: 3},
+                {name: '雨水', month: 2, day: 18},
+                {name: '惊蛰', month: 3, day: 5},
+                {name: '春分', month: 3, day: 20},
+                {name: '清明', month: 4, day: 4},
+                {name: '谷雨', month: 4, day: 20},
+                {name: '立夏', month: 5, day: 5},
+                {name: '小满', month: 5, day: 21},
+                {name: '芒种', month: 6, day: 5},
+                {name: '夏至', month: 6, day: 21},
+                {name: '小暑', month: 7, day: 7},
+                {name: '大暑', month: 7, day: 22},
+                {name: '立秋', month: 8, day: 7},
+                {name: '处暑', month: 8, day: 23},
+                {name: '白露', month: 9, day: 7},
+                {name: '秋分', month: 9, day: 23},
+                {name: '寒露', month: 10, day: 8},
+                {name: '霜降', month: 10, day: 23},
+                {name: '立冬', month: 11, day: 7},
+                {name: '小雪', month: 11, day: 22},
+                {name: '大雪', month: 12, day: 7},
+                {name: '冬至', month: 12, day: 21}
+            ],
+            2026: [
+                {name: '小寒', month: 1, day: 5},
+                {name: '大寒', month: 1, day: 20},
+                {name: '立春', month: 2, day: 4},
+                {name: '雨水', month: 2, day: 18},
+                {name: '惊蛰', month: 3, day: 5},
+                {name: '春分', month: 3, day: 20},
+                {name: '清明', month: 4, day: 5},
+                {name: '谷雨', month: 4, day: 20},
+                {name: '立夏', month: 5, day: 5},
+                {name: '小满', month: 5, day: 21},
+                {name: '芒种', month: 6, day: 5},
+                {name: '夏至', month: 6, day: 21},
+                {name: '小暑', month: 7, day: 7},
+                {name: '大暑', month: 7, day: 22},
+                {name: '立秋', month: 8, day: 7},
+                {name: '处暑', month: 8, day: 23},
+                {name: '白露', month: 9, day: 7},
+                {name: '秋分', month: 9, day: 23},
+                {name: '寒露', month: 10, day: 8},
+                {name: '霜降', month: 10, day: 23},
+                {name: '立冬', month: 11, day: 7},
+                {name: '小雪', month: 11, day: 22},
+                {name: '大雪', month: 12, day: 7},
+                {name: '冬至', month: 12, day: 22}
+            ]
+        };
         
         // 获取当前节气
         function getCurrentSolarTerm(date) {
+            const year = date.getFullYear();
             const month = date.getMonth() + 1;
             const day = date.getDate();
             
+            const terms = solarTermData[year] || solarTermData[2025];
+            
             // 找到当前节气
             let currentTerm = null;
-            for (let i = 0; i < solarTerms.length; i++) {
-                const term = solarTerms[i];
-                if (term.month === month && Math.abs(term.day - day) <= 7) {
+            for (let i = 0; i < terms.length; i++) {
+                const term = terms[i];
+                if (term.month === month && Math.abs(term.day - day) <= 1) {
                     currentTerm = term.name;
                     break;
                 }
@@ -2160,8 +2193,8 @@
             
             // 如果没有找到接近的节气，找最近的
             if (!currentTerm) {
-                for (let i = solarTerms.length - 1; i >= 0; i--) {
-                    const term = solarTerms[i];
+                for (let i = terms.length - 1; i >= 0; i--) {
+                    const term = terms[i];
                     if (term.month < month || (term.month === month && term.day <= day)) {
                         currentTerm = term.name;
                         break;
@@ -2172,22 +2205,100 @@
             return currentTerm || '立春';
         }
         
-        // 简化的农历转换（基于1900年的偏移计算）
+        // 使用 lunar-javascript 库计算农历
         function getLunarDate(date) {
-            // 1900年1月31日是农历1900年正月初一
-            const baseDate = new Date(1900, 0, 31);
-            const offset = Math.floor((date - baseDate) / 86400000);
+            try {
+                // 如果库已加载，使用库计算
+                if (typeof Lunar !== 'undefined') {
+                    const lunar = Lunar.fromDate(date);
+                    return {
+                        year: lunar.getYear(),
+                        month: lunar.getMonth() - 1, // 转换为0索引
+                        day: lunar.getDay(),
+                        isLeap: lunar.isLeap()
+                    };
+                }
+            } catch (e) {
+                console.log('Lunar library not available, using fallback');
+            }
             
-            // 简化的农历数据（实际应用需要更精确的农历数据）
-            // 这里使用近似算法
-            const lunarYear = date.getFullYear();
-            const lunarMonth = (date.getMonth() + 10) % 12;
-            const lunarDay = ((offset % 30) + 1) % 30;
+            // 备用算法：基于已知日期推算
+            return getLunarDateFallback(date);
+        }
+        
+        // 备用农历算法
+        function getLunarDateFallback(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            
+            // 2025年春节：2025年1月29日（乙巳年正月初一）
+            // 2026年春节：2026年2月17日（丙午年正月初一）
+            
+            const spring2025 = new Date(2025, 0, 29);
+            const spring2026 = new Date(2026, 1, 17);
+            
+            let lunarYear, lunarMonth, lunarDay;
+            
+            if (date < spring2025) {
+                // 2025年春节前，是甲辰年（龙年）
+                lunarYear = 2024;
+                const prevSpring = new Date(2024, 1, 10); // 2024年春节
+                const daysDiff = Math.floor((date - prevSpring) / 86400000);
+                
+                // 2024年农历月份天数（甲辰年）
+                const monthLengths = [29, 30, 29, 30, 29, 30, 29, 30, 30, 29, 30, 29];
+                
+                let remaining = daysDiff;
+                let m = 0;
+                while (remaining >= monthLengths[m] && m < 11) {
+                    remaining -= monthLengths[m];
+                    m++;
+                }
+                lunarMonth = m;
+                lunarDay = remaining + 1;
+                
+            } else if (date >= spring2025 && date < spring2026) {
+                // 2025年农历（乙巳年，闰六月）
+                lunarYear = 2025;
+                const daysDiff = Math.floor((date - spring2025) / 86400000);
+                
+                // 2025年农历月份天数（乙巳年，闰六月）
+                // 正月30, 二月29, 三月30, 四月29, 五月30, 六月29, 闰六月30, 七月29, 八月30, 九月29, 十月30, 冬月29, 腊月30
+                const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30];
+                const monthMap = [0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11]; // 闰六月
+                
+                let remaining = daysDiff;
+                let m = 0;
+                while (remaining >= monthLengths[m] && m < 12) {
+                    remaining -= monthLengths[m];
+                    m++;
+                }
+                lunarMonth = monthMap[m];
+                lunarDay = remaining + 1;
+                
+            } else {
+                // 2026年农历（丙午年）
+                lunarYear = 2026;
+                const daysDiff = Math.floor((date - spring2026) / 86400000);
+                
+                // 2026年农历月份天数（丙午年）
+                const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+                
+                let remaining = daysDiff;
+                let m = 0;
+                while (remaining >= monthLengths[m] && m < 11) {
+                    remaining -= monthLengths[m];
+                    m++;
+                }
+                lunarMonth = m;
+                lunarDay = remaining + 1;
+            }
             
             return {
                 year: lunarYear,
-                month: lunarMonth,
-                day: Math.max(1, lunarDay),
+                month: Math.min(11, Math.max(0, lunarMonth)),
+                day: Math.min(30, Math.max(1, lunarDay)),
                 isLeap: false
             };
         }
