@@ -2382,19 +2382,23 @@
             document.getElementById('currentTime').textContent = timeStr;
         }
 
-        // Initialize and update visit counter
-        function initVisitCounter() {
-            // Get current count
-            let count = parseInt(localStorage.getItem('tcm_visit_count') || '0');
-            
-            // Increment count
-            count++;
-            
-            // Save new count
-            localStorage.setItem('tcm_visit_count', count.toString());
-            
-            // Display with animation
-            animateCounter(count);
+        // Initialize and update visit counter using countapi.xyz
+        async function initVisitCounter() {
+            try {
+                // 使用 countapi.xyz 服务 - 每次访问自动递增
+                const response = await fetch('https://api.countapi.xyz/hit/tcm-ancient-books.github.io/visits');
+                const data = await response.json();
+                
+                // Display with animation
+                animateCounter(data.value);
+            } catch (error) {
+                console.error('计数服务暂时不可用:', error);
+                // 备用：使用本地计数
+                let count = parseInt(localStorage.getItem('tcm_visit_count') || '0');
+                count++;
+                localStorage.setItem('tcm_visit_count', count.toString());
+                animateCounter(count);
+            }
         }
 
         // Animate counter number
