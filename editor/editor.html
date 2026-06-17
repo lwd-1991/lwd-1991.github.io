@@ -6,7 +6,6 @@
     <title>TXT 编辑器 - 中医古籍（优化版）</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
     <style>
-        /* （保留你原有样式，这里为简洁展示只保留关键样式） */
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'Noto Serif SC',serif;background:linear-gradient(135deg,#FDF5E6,#F5E6D3);color:#3D2914;min-height:100vh}
         .header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
@@ -19,6 +18,7 @@
         .status-bar{padding:8px 12px;background:#2C1810;color:#C4A77D;display:flex;justify-content:space-between}
         .toast{position:fixed;right:20px;bottom:40px;padding:8px 12px;border-radius:8px;color:#fff;display:none}
         .toast.show{display:block}
+        .autosave-indicator{margin-left:12px;color:#8B7355;font-size:0.9rem}
     </style>
 </head>
 <body>
@@ -36,6 +36,11 @@
         <div style="margin-left:8px;color:#8B7355" id="fileName">未打开</div>
         <input id="fileInput" type="file" accept=".txt,.md,.json,.html,.csv" style="display:none">
         <div style="margin-left:auto">加载进度: <span id="progressText">0%</span></div>
+    </div>
+
+    <div style="padding:8px 12px">
+        <label><input type="checkbox" id="autosaveToggle" checked> 自动保存（LocalStorage）</label>
+        <span class="autosave-indicator" id="autosaveIndicator"></span>
     </div>
 
     <div class="editor-wrapper">
@@ -72,12 +77,21 @@
     const cancelLoadBtn = document.getElementById('cancelLoadBtn')
     const saveBtn = document.getElementById('saveBtn')
     const toast = document.getElementById('toast')
+    const autosaveToggle = document.getElementById('autosaveToggle')
+    const autosaveIndicator = document.getElementById('autosaveIndicator')
 
     // Worker，用于流式读取/解析
     const worker = new Worker('editor-worker.js')
     let loadingTaskId = null
     let appendBuffer = ''
     let flushScheduled = false
+    let currentEncoding = 'utf-8'
+    let currentFileName = 'untitled.txt'
+
+    // Autosave state
+    const AUTOSAVE_INTERVAL = 5000
+    let autosaveTimer = null
+    let lastAutosave = 0
 
     // 进度显示
     function setProgress(p) {
@@ -92,14 +106,54 @@
         setTimeout(()=> toast.classList.remove('show'), timeout)
     }
 
+    // Autosave key
+    function autosaveKey(name) { return 'tcm_autosave::' + (name || 'untitled') }
+
+    function startAutosave() {
+        stopAutosave()
+        if (!autosaveToggle.checked) return
+        autosaveTimer = setInterval(() => {
+            try {
+                const v = editor.value
+                localStorage.setItem(autosaveKey(currentFileName), JSON.stringify({ text: v, at: Date.now(), encoding: currentEncoding }))
+                lastAutosave = Date.now()
+                autosaveIndicator.textContent = '已自动保存 ' + new Date(lastAutosave).toLocaleTimeString()
+            } catch (err) {
+                console.warn('autosave error', err)
+            }
+        }, AUTOSAVE_INTERVAL)
+    }
+    function stopAutosave() { if (autosaveTimer) { clearInterval(autosaveTimer); autosaveTimer = null } }
+
+    function clearAutosave(name) { localStorage.removeItem(autosaveKey(name)) }
+
+    // Check for existing autosave at load
+    function checkRestoreOnLoad() {
+        const k = autosaveKey(currentFileName)
+        const raw = localStorage.getItem(k)
+        if (raw) {
+            try {
+                const obj = JSON.parse(raw)
+                if (obj && obj.text && confirm('检测到本地自动保存内容，是否恢复？\n(将替换当前编辑区内容)')) {
+                    editor.value = obj.text
+                    currentEncoding = obj.encoding || 'utf-8'
+                    document.getElementById('encoding').textContent = currentEncoding
+                    showEditor()
+                    updateStats()
+                    showToast('已恢复自动保存的数据',1500)
+                } else {
+                    // keep but allow user to restore later
+                }
+            } catch (e) { console.warn('parse autosave fail', e) }
+        }
+    }
+
     // 批量追加文本到 textarea（合并多次小 chunk）
     function appendChunk(text) {
         appendBuffer += text
         if (!flushScheduled) {
             flushScheduled = true
             requestAnimationFrame(() => {
-                // 一次性追加并重置
-                const wasScroll = editor.scrollTop
                 editor.value += appendBuffer
                 appendBuffer = ''
                 flushScheduled = false
@@ -120,13 +174,24 @@
             loadingTaskId = null
             cancelLoadBtn.style.display = 'none'
             saveBtn.disabled = false
+            startAutosave()
             showToast('加载完成', 1800)
         } else if (msg.type === 'error') {
             loadingTaskId = null
             cancelLoadBtn.style.display = 'none'
             showToast('加载失败: ' + msg.message, 3000)
-            // 恢复欢迎界面
-            if (!editor.value) {
+            if (!editor.value) { welcome.style.display = ''; editor.style.display = 'none' }
+        } else if (msg.type === 'encoding-issue') {
+            // 主线程处理编码检测失败，提示用户
+            const tryGbk = confirm('检测到文件可能不是 UTF-8 编码，是否尝试使用 GBK 打开？(浏览器需支持 GBK)')
+            if (tryGbk) {
+                currentEncoding = 'gbk'
+                document.getElementById('encoding').textContent = currentEncoding
+                worker.postMessage({ action: 'resume-with-encoding', id: msg.id, encoding: 'gbk' })
+            } else {
+                showToast('已取消加载（编码不兼容）', 2500)
+                // stop task
+                worker.postMessage({ action: 'cancel', id: msg.id })
                 welcome.style.display = ''
                 editor.style.display = 'none'
             }
@@ -140,7 +205,8 @@
     fileInput.addEventListener('change', (e) => {
         const f = e.target.files && e.target.files[0]
         if (!f) return
-        beginLoad({ kind: 'file', file: f })
+        currentFileName = f.name || 'untitled.txt'
+        beginLoad({ kind: 'file', file: f, encoding: 'auto' })
         e.target.value = ''
     })
 
@@ -149,8 +215,7 @@
         const params = new URLSearchParams(window.location.search)
         const fileParam = params.get('file')
         if (!fileParam) return
-        // 通过 worker fetch 流式加载
-        beginLoad({ kind: 'url', url: decodeURIComponent(fileParam) })
+        beginLoad({ kind: 'url', url: decodeURIComponent(fileParam), encoding: 'auto' })
     }
 
     // 启动加载任务（file 或 url）并切换 UI
@@ -159,12 +224,17 @@
         welcome.style.display = 'none'
         editor.style.display = 'block'
         fileNameEl.textContent = task.kind === 'file' ? task.file.name : task.url
+        currentFileName = task.kind === 'file' ? task.file.name : task.url
+        document.getElementById('encoding').textContent = 'detecting...'
         setProgress(0)
         cancelLoadBtn.style.display = 'inline-block'
         saveBtn.disabled = true
+        stopAutosave()
         // 发送给 worker；worker 会连续 postMessage('chunk')
         loadingTaskId = Math.random().toString(36).slice(2)
         worker.postMessage({ action: 'start', id: loadingTaskId, task })
+        // check for autosave restore later
+        setTimeout(checkRestoreOnLoad, 600)
     }
 
     // 取消加载
@@ -173,18 +243,19 @@
         worker.postMessage({ action: 'cancel', id: loadingTaskId })
         cancelLoadBtn.style.display = 'none'
         showToast('已请求取消加载', 1200)
+        stopAutosave()
     })
 
     // 保存（使用下载或 File System Access）
     saveBtn.addEventListener('click', async () => {
         const text = editor.value
-        // 尽量使用 File System Access API（仅在支持且安全上下文）
         if ('showSaveFilePicker' in window) {
             try {
-                const handle = await window.showSaveFilePicker({ suggestedName: fileNameEl.textContent || 'untitled.txt', types:[{description:'文本',accept:{'text/plain':['.txt']}}] })
+                const handle = await window.showSaveFilePicker({ suggestedName: currentFileName || 'untitled.txt', types:[{description:'文本',accept:{'text/plain':['.txt']}}] })
                 const w = await handle.createWritable()
                 await w.write(text)
                 await w.close()
+                clearAutosave(currentFileName)
                 showToast('已保存')
             } catch (err) {
                 if (err.name !== 'AbortError') showToast('保存失败：' + err.message)
@@ -192,9 +263,10 @@
         } else {
             const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
             const url = URL.createObjectURL(blob)
-            const a = document.createElement('a'); a.href = url; a.download = fileNameEl.textContent || 'untitled.txt'
+            const a = document.createElement('a'); a.href = url; a.download = currentFileName || 'untitled.txt'
             document.body.appendChild(a); a.click(); a.remove()
             URL.revokeObjectURL(url)
+            clearAutosave(currentFileName)
             showToast('已下载保存')
         }
     })
@@ -210,9 +282,7 @@
         if (statsTimer) return
         statsTimer = setTimeout(()=> { updateStats(); statsTimer = null }, 160)
     }
-    editor.addEventListener('input', () => {
-        updateStatsThrottled()
-    })
+    editor.addEventListener('input', () => { updateStatsThrottled() })
 
     // 光标位置（节流）
     let cursorTimer = null
@@ -230,6 +300,26 @@
     const fontSizeSlider = document.getElementById('fontSizeSlider')
     fontSizeSlider.addEventListener('input', ()=> { editor.style.fontSize = fontSizeSlider.value + 'px'; localStorage.setItem('tcm_font', fontSizeSlider.value) })
     const saved = localStorage.getItem('tcm_font'); if (saved) { fontSizeSlider.value = saved; editor.style.fontSize = saved + 'px' }
+
+    // Autosave toggle
+    autosaveToggle.addEventListener('change', () => { if (autosaveToggle.checked) startAutosave(); else { stopAutosave(); autosaveIndicator.textContent = '' } })
+
+    // Warn before leaving
+    window.addEventListener('beforeunload', e => {
+        if (autosaveToggle.checked) {
+            // ensure last autosave
+            try { localStorage.setItem(autosaveKey(currentFileName), JSON.stringify({ text: editor.value, at: Date.now(), encoding: currentEncoding })) } catch (_) {}
+        }
+    })
+
+    // helper to show editor UI
+    function showEditor() {
+        welcome.classList.add('hidden')
+        welcome.style.display = 'none'
+        editor.style.display = 'block'
+        saveBtn.disabled = false
+        startAutosave()
+    }
 
     // 页加载时尝试通过 URL 加载
     window.addEventListener('load', loadFileFromURLAtStartup)
