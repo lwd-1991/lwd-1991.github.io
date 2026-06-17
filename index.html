@@ -1169,7 +1169,7 @@
                 </div>
                 <div class="counter-display">
                     <span class="counter-icon">👁️</span>
-                    <span id="counterDisplay">访问量：<span class="counter-number" id="counterValue">统计中...</span></span>
+                    <span id="counterDisplay">访问量：<span class="counter-number" id="counterValue">统计中...</span><span id="badgeContainer" style="display:none;"></span></span>
                 </div>
             </div>
         </div>
@@ -2391,59 +2391,41 @@
         updateDateTime();
         setInterval(updateDateTime, 1000); // Update every second
 
-        // ========== 访问量计数器（CountAPI + localStorage 双保险） ==========
+        // ========== 访问量计数器（Badge 图片 + localStorage 双保险） ==========
         async function loadCounter() {
             const counterEl = document.getElementById('counterValue');
-            
-            // 尝试从 localStorage 读取上一次计数（本地缓存），避免每次都闪烁
-            const cached = localStorage.getItem('tcm_last_pv');
+            const badgeEl = document.getElementById('badgeContainer');
+            const pageId = window.location.hostname || 'ws37.top';
+
+            // 尝试从 localStorage 读取上一次计数（本地缓存，避免闪烁）
+            var cached = localStorage.getItem('tcm_last_pv');
             if (cached) {
                 counterEl.textContent = cached;
             }
 
-            // 尝试 CountAPI（免费、稳定、无需注册）
+            // 构建 Badge URL
+            // 用 hostname 作为 page_id，本地和线上各不干扰
+            var badgeUrl = 'https://visitor-badge.laobi.icu/badge?page_id=' + encodeURIComponent(pageId);
+
+            // 显示 Badge 徽章（<img> 方式，无 CORS 问题）
+            badgeEl.innerHTML = '<img src="' + badgeUrl + '" alt="访问量" style="height:20px;vertical-align:middle;margin-left:4px;border-radius:3px;">';
+            badgeEl.style.display = 'inline';
+            counterEl.style.display = 'none';
+
+            // 尝试从 Badge SVG 中提取数字（备用在线计数）
             try {
-                const resp = await fetch('https://api.countapi.xyz/hit/ws37.top/visitors', {
-                    signal: AbortSignal.timeout(5000)
-                });
-                const data = await resp.json();
-                if (data && data.value) {
-                    const formatted = data.value.toLocaleString();
-                    counterEl.textContent = formatted;
-                    localStorage.setItem('tcm_last_pv', formatted);
-                    return;
+                var resp = await fetch(badgeUrl, { signal: AbortSignal.timeout(4000) });
+                var svg = await resp.text();
+                var match = svg.match(/<text[^>]*>(\d+)<\/text>/g);
+                if (match && match.length > 0) {
+                    var num = parseInt(match[match.length - 1].match(/(\d+)/)[1]);
+                    if (!isNaN(num) && num > 0) {
+                        localStorage.setItem('tcm_last_pv', num.toLocaleString());
+                    }
                 }
             } catch (e) {
-                console.log('CountAPI failed, trying backup...', e);
-            }
-
-            // 备选：再试一次不同的 CountAPI 命名空间
-            try {
-                const resp = await fetch('https://api.countapi.xyz/hit/ws37.top/visitors', {
-                    signal: AbortSignal.timeout(3000)
-                });
-                const data = await resp.json();
-                if (data && data.value) {
-                    const formatted = data.value.toLocaleString();
-                    counterEl.textContent = formatted;
-                    localStorage.setItem('tcm_last_pv', formatted);
-                    return;
-                }
-            } catch (e) {
-                console.log('CountAPI backup also failed', e);
-            }
-
-            // 最终兜底：使用 localStorage 本地计数
-            if (!cached) {
-                let localCount = parseInt(localStorage.getItem('tcm_local_pv') || '0');
-                localCount++;
-                localStorage.setItem('tcm_local_pv', String(localCount));
-                if (localCount > 1) {
-                    counterEl.textContent = localCount.toLocaleString() + ' (本地)';
-                } else {
-                    counterEl.textContent = '--';
-                }
-                localStorage.setItem('tcm_last_pv', counterEl.textContent);
+                // CORS 限制下无法解析 SVG，但 Badge 图片仍正常显示
+                console.log('Badge svg parse unavailable (CORS), badge image still works');
             }
         }
         // 页面加载后立即执行
