@@ -9,8 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
     <!-- 农历库 -->
     <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.2.0/lunar.min.js"></script>
-    <!-- 不蒜子统计 -->
-    <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <!-- 不蒜子统计已迁移至 CountAPI，更稳定可靠 -->
     <style>
         * {
             margin: 0;
@@ -1170,8 +1169,7 @@
                 </div>
                 <div class="counter-display">
                     <span class="counter-icon">👁️</span>
-                    <span id="busuanzi_container_site_pv" style="display:none;">访问量：<span class="counter-number" id="busuanzi_value_site_pv"></span></span>
-                    <span id="counterPlaceholder">访问量统计中...</span>
+                    <span id="counterDisplay">访问量：<span class="counter-number" id="counterValue">统计中...</span></span>
                 </div>
             </div>
         </div>
@@ -1214,18 +1212,18 @@
             <h2>典籍分类</h2>
         </div>
         <div class="category-filters" id="categoryFilters">
-            <button class="category-btn active" onclick="filterByCategory('all')">全部</button>
-            <button class="category-btn" onclick="filterByCategory('本草')">本草类</button>
-            <button class="category-btn" onclick="filterByCategory('伤寒')">伤寒类</button>
-            <button class="category-btn" onclick="filterByCategory('金匮')">金匮类</button>
-            <button class="category-btn" onclick="filterByCategory('内经')">内经类</button>
-            <button class="category-btn" onclick="filterByCategory('方书')">方书类</button>
-            <button class="category-btn" onclick="filterByCategory('女科')">女科类</button>
-            <button class="category-btn" onclick="filterByCategory('儿科')">儿科类</button>
-            <button class="category-btn" onclick="filterByCategory('外科')">外科类</button>
-            <button class="category-btn" onclick="filterByCategory('针灸')">针灸类</button>
-            <button class="category-btn" onclick="filterByCategory('医案')">医案类</button>
-            <button class="category-btn" onclick="filterByCategory('医论')">医论类</button>
+            <button class="category-btn active" onclick="filterByCategory('all', this)">全部</button>
+            <button class="category-btn" onclick="filterByCategory('本草', this)">本草类</button>
+            <button class="category-btn" onclick="filterByCategory('伤寒', this)">伤寒类</button>
+            <button class="category-btn" onclick="filterByCategory('金匮', this)">金匮类</button>
+            <button class="category-btn" onclick="filterByCategory('内经', this)">内经类</button>
+            <button class="category-btn" onclick="filterByCategory('方书', this)">方书类</button>
+            <button class="category-btn" onclick="filterByCategory('女科', this)">女科类</button>
+            <button class="category-btn" onclick="filterByCategory('儿科', this)">儿科类</button>
+            <button class="category-btn" onclick="filterByCategory('外科', this)">外科类</button>
+            <button class="category-btn" onclick="filterByCategory('针灸', this)">针灸类</button>
+            <button class="category-btn" onclick="filterByCategory('医案', this)">医案类</button>
+            <button class="category-btn" onclick="filterByCategory('医论', this)">医论类</button>
         </div>
     </section>
 
@@ -2088,14 +2086,18 @@
             document.querySelector('.books-container').scrollIntoView({ behavior: 'smooth' });
         }
 
-        function filterByCategory(category) {
+        function filterByCategory(category, el) {
             currentCategory = category;
             currentPage = 1;
             
             document.querySelectorAll('.category-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (el) {
+                el.classList.add('active');
+            } else if (event && event.target) {
+                event.target.classList.add('active');
+            }
             
             renderBooks();
         }
@@ -2389,24 +2391,67 @@
         updateDateTime();
         setInterval(updateDateTime, 1000); // Update every second
 
-        // 不蒜子统计 - 加载完成后显示计数
-        let busuanziRetries = 0;
-        const BUSUANZI_MAX_RETRIES = 15;
-        function checkBusuanziLoaded() {
-            const pvSpan = document.getElementById('busuanzi_value_site_pv');
-            const container = document.getElementById('busuanzi_container_site_pv');
-            const placeholder = document.getElementById('counterPlaceholder');
-            busuanziRetries++;
-            if (pvSpan && parseInt(pvSpan.textContent) > 0) {
-                container.style.display = 'inline';
-                placeholder.style.display = 'none';
-            } else if (busuanziRetries < BUSUANZI_MAX_RETRIES) {
-                setTimeout(checkBusuanziLoaded, 800);
-            } else {
-                placeholder.textContent = '访问量：--';
+        // ========== 访问量计数器（CountAPI + localStorage 双保险） ==========
+        async function loadCounter() {
+            const counterEl = document.getElementById('counterValue');
+            
+            // 尝试从 localStorage 读取上一次计数（本地缓存），避免每次都闪烁
+            const cached = localStorage.getItem('tcm_last_pv');
+            if (cached) {
+                counterEl.textContent = cached;
+            }
+
+            // 尝试 CountAPI（免费、稳定、无需注册）
+            try {
+                const resp = await fetch('https://api.countapi.xyz/hit/ws37.top/visitors', {
+                    signal: AbortSignal.timeout(5000)
+                });
+                const data = await resp.json();
+                if (data && data.value) {
+                    const formatted = data.value.toLocaleString();
+                    counterEl.textContent = formatted;
+                    localStorage.setItem('tcm_last_pv', formatted);
+                    return;
+                }
+            } catch (e) {
+                console.log('CountAPI failed, trying backup...', e);
+            }
+
+            // 备选：再试一次不同的 CountAPI 命名空间
+            try {
+                const resp = await fetch('https://api.countapi.xyz/hit/ws37.top/visitors', {
+                    signal: AbortSignal.timeout(3000)
+                });
+                const data = await resp.json();
+                if (data && data.value) {
+                    const formatted = data.value.toLocaleString();
+                    counterEl.textContent = formatted;
+                    localStorage.setItem('tcm_last_pv', formatted);
+                    return;
+                }
+            } catch (e) {
+                console.log('CountAPI backup also failed', e);
+            }
+
+            // 最终兜底：使用 localStorage 本地计数
+            if (!cached) {
+                let localCount = parseInt(localStorage.getItem('tcm_local_pv') || '0');
+                localCount++;
+                localStorage.setItem('tcm_local_pv', String(localCount));
+                if (localCount > 1) {
+                    counterEl.textContent = localCount.toLocaleString() + ' (本地)';
+                } else {
+                    counterEl.textContent = '--';
+                }
+                localStorage.setItem('tcm_last_pv', counterEl.textContent);
             }
         }
-        setTimeout(checkBusuanziLoaded, 1500);
+        // 页面加载后立即执行
+        if (document.readyState === 'complete') {
+            loadCounter();
+        } else {
+            window.addEventListener('load', loadCounter);
+        }
 
         // ========== Guestbook Functions ==========
         
