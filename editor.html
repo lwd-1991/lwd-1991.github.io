@@ -521,6 +521,60 @@
             if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); newFile() }
         })
 
+        // === 从 URL 参数自动加载文件（索引页点击编辑链接时触发） ===
+        async function loadFileFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const fileParam = params.get('file');
+            if (!fileParam) return;
+
+            const fileName = decodeURIComponent(fileParam);
+            const statusEl = document.getElementById('fileStatus');
+
+            // 显示加载中状态
+            welcome.classList.add('hidden');
+            editor.style.display = 'block';
+            document.getElementById('fileInfoGroup').style.display = 'flex';
+            editor.value = '正在加载 ' + fileName + ' ...';
+            updateFileInfo(fileName);
+            statusEl.textContent = '加载中...';
+            statusEl.className = 'file-status modified';
+            document.getElementById('saveBtn').disabled = false;
+            document.getElementById('saveAsBtn').disabled = false;
+
+            try {
+                const resp = await fetch(fileName);
+                if (!resp.ok) throw new Error('HTTP ' + resp.status + ': ' + resp.statusText);
+                const content = await resp.text();
+
+                currentFile = { name: fileName };
+                currentFileHandle = null;
+                originalContent = content;
+                isModified = false;
+                editor.value = content;
+                updateFileStatus();
+                updateStats();
+                updateCursor();
+                editor.focus();
+                showToast('已打开: ' + fileName, 'success');
+            } catch (err) {
+                editor.value = '';
+                statusEl.textContent = '打开失败';
+                statusEl.className = 'file-status modified';
+                showToast('无法加载文件: ' + fileName + ' — ' + err.message, 'error');
+                // 回退到欢迎界面
+                welcome.classList.remove('hidden');
+                editor.style.display = 'none';
+                document.getElementById('fileInfoGroup').style.display = 'none';
+            }
+        }
+
+        // 页面加载时执行
+        if (document.readyState === 'complete') {
+            loadFileFromURL();
+        } else {
+            window.addEventListener('load', loadFileFromURL);
+        }
+
         // Warn before leaving
         window.addEventListener('beforeunload', e => {
             if (isModified) { e.preventDefault(); e.returnValue = '' }
