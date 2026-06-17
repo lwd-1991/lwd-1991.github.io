@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TXT 编辑器 - 中医古籍（优化版）</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+    <style>
+        /* （保留你原有样式，这里为简洁展示只保留关键样式） */
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Noto Serif SC',serif;background:linear-gradient(135deg,#FDF5E6,#F5E6D3);color:#3D2914;min-height:100vh}
+        .header{padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+        .toolbar{padding:10px;display:flex;gap:8px;background:#fff;border-bottom:1px solid #D4A574}
+        .editor-wrapper{height:calc(100vh - 140px);position:relative}
+        textarea{width:100%;height:100%;padding:24px;font-size:16px;line-height:1.9;display:none;resize:none}
+        .welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+        .progress{height:8px;background:#eee;border-radius:8px;overflow:hidden;width:320px}
+        .progress > i{display:block;height:100%;width:0;background:#8B4513}
+        .status-bar{padding:8px 12px;background:#2C1810;color:#C4A77D;display:flex;justify-content:space-between}
+        .toast{position:fixed;right:20px;bottom:40px;padding:8px 12px;border-radius:8px;color:#fff;display:none}
+        .toast.show{display:block}
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div><a href="index.html">← 返回典藏</a> <strong style="margin-left:12px">TXT 编辑器（优化）</strong></div>
+        <div>
+            <label>字号 <input id="fontSizeSlider" type="range" min="12" max="28" value="16"></label>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <button class="btn" id="openBtn">打开</button>
+        <button class="btn" id="saveBtn" disabled>保存</button>
+        <button class="btn" id="cancelLoadBtn" style="display:none">取消加载</button>
+        <div style="margin-left:8px;color:#8B7355" id="fileName">未打开</div>
+        <input id="fileInput" type="file" accept=".txt,.md,.json,.html,.csv" style="display:none">
+        <div style="margin-left:auto">加载进度: <span id="progressText">0%</span></div>
+    </div>
+
+    <div class="editor-wrapper">
+        <div class="welcome" id="welcome">
+            <div style="font-size:48px;opacity:.2">📜</div>
+            <h2>TXT 编辑器（优化版）</h2>
+            <p>支持大文件渐进式加载（Web Worker）与取消，避免 UI 卡顿。</p>
+            <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+            <div style="margin-top:8px">
+                <button id="openLocal" class="btn">打开本地文件</button>
+            </div>
+        </div>
+
+        <textarea id="editor" spellcheck="false" wrap="off" aria-label="文本编辑区"></textarea>
+    </div>
+
+    <div class="status-bar">
+        <div>编码: <span id="encoding">UTF-8</span> · 行: <span id="lineCount">0</span> · 字: <span id="charCount">0</span></div>
+        <div id="cursorPos">行 1, 列 1</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ----- 基本引用 -----
+    const fileInput = document.getElementById('fileInput')
+    const openBtn = document.getElementById('openBtn')
+    const openLocal = document.getElementById('openLocal')
+    const editor = document.getElementById('editor')
+    const welcome = document.getElementById('welcome')
+    const fileNameEl = document.getElementById('fileName')
+    const progressBar = document.getElementById('progressBar')
+    const progressText = document.getElementById('progressText')
+    const cancelLoadBtn = document.getElementById('cancelLoadBtn')
+    const saveBtn = document.getElementById('saveBtn')
+    const toast = document.getElementById('toast')
+
+    // Worker，用于流式读取/解析
+    const worker = new Worker('editor-worker.js')
+    let loadingTaskId = null
+    let appendBuffer = ''
+    let flushScheduled = false
+
+    // 进度显示
+    function setProgress(p) {
+        const pc = Math.round(p * 100)
+        progressBar.style.width = (pc) + '%'
+        progressText.textContent = pc + '%'
+    }
+
+    function showToast(msg, timeout=2500) {
+        toast.textContent = msg
+        toast.classList.add('show')
+        setTimeout(()=> toast.classList.remove('show'), timeout)
+    }
+
+    // 批量追加文本到 textarea（合并多次小 chunk）
+    function appendChunk(text) {
+        appendBuffer += text
+        if (!flushScheduled) {
+            flushScheduled = true
+            requestAnimationFrame(() => {
+                // 一次性追加并重置
+                const wasScroll = editor.scrollTop
+                editor.value += appendBuffer
+                appendBuffer = ''
+                flushScheduled = false
+                updateStatsThrottled()
+            })
+        }
+    }
+
+    // Worker 消息处理
+    worker.addEventListener('message', (ev) => {
+        const msg = ev.data
+        if (msg.type === 'chunk') {
+            appendChunk(msg.text)
+        } else if (msg.type === 'progress') {
+            setProgress(msg.ratio)
+        } else if (msg.type === 'done') {
+            setProgress(1)
+            loadingTaskId = null
+            cancelLoadBtn.style.display = 'none'
+            saveBtn.disabled = false
+            showToast('加载完成', 1800)
+        } else if (msg.type === 'error') {
+            loadingTaskId = null
+            cancelLoadBtn.style.display = 'none'
+            showToast('加载失败: ' + msg.message, 3000)
+            // 恢复欢迎界面
+            if (!editor.value) {
+                welcome.style.display = ''
+                editor.style.display = 'none'
+            }
+        }
+    })
+
+    // 打开本地文件（通过 input）
+    openLocal.addEventListener('click', ()=> fileInput.click())
+    openBtn.addEventListener('click', ()=> fileInput.click())
+
+    fileInput.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0]
+        if (!f) return
+        beginLoad({ kind: 'file', file: f })
+        e.target.value = ''
+    })
+
+    // 从 URL 参数加载（index.html 的链接传 file=path）
+    async function loadFileFromURLAtStartup() {
+        const params = new URLSearchParams(window.location.search)
+        const fileParam = params.get('file')
+        if (!fileParam) return
+        // 通过 worker fetch 流式加载
+        beginLoad({ kind: 'url', url: decodeURIComponent(fileParam) })
+    }
+
+    // 启动加载任务（file 或 url）并切换 UI
+    function beginLoad(task) {
+        editor.value = ''
+        welcome.style.display = 'none'
+        editor.style.display = 'block'
+        fileNameEl.textContent = task.kind === 'file' ? task.file.name : task.url
+        setProgress(0)
+        cancelLoadBtn.style.display = 'inline-block'
+        saveBtn.disabled = true
+        // 发送给 worker；worker 会连续 postMessage('chunk')
+        loadingTaskId = Math.random().toString(36).slice(2)
+        worker.postMessage({ action: 'start', id: loadingTaskId, task })
+    }
+
+    // 取消加载
+    cancelLoadBtn.addEventListener('click', () => {
+        if (!loadingTaskId) return
+        worker.postMessage({ action: 'cancel', id: loadingTaskId })
+        cancelLoadBtn.style.display = 'none'
+        showToast('已请求取消加载', 1200)
+    })
+
+    // 保存（使用下载或 File System Access）
+    saveBtn.addEventListener('click', async () => {
+        const text = editor.value
+        // 尽量使用 File System Access API（仅在支持且安全上下文）
+        if ('showSaveFilePicker' in window) {
+            try {
+                const handle = await window.showSaveFilePicker({ suggestedName: fileNameEl.textContent || 'untitled.txt', types:[{description:'文本',accept:{'text/plain':['.txt']}}] })
+                const w = await handle.createWritable()
+                await w.write(text)
+                await w.close()
+                showToast('已保存')
+            } catch (err) {
+                if (err.name !== 'AbortError') showToast('保存失败：' + err.message)
+            }
+        } else {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a'); a.href = url; a.download = fileNameEl.textContent || 'untitled.txt'
+            document.body.appendChild(a); a.click(); a.remove()
+            URL.revokeObjectURL(url)
+            showToast('已下载保存')
+        }
+    })
+
+    // ----- 编辑器状态更新（节流） -----
+    function updateStats() {
+        const t = editor.value
+        document.getElementById('lineCount').textContent = t ? t.split('\n').length : 0
+        document.getElementById('charCount').textContent = t.length
+    }
+    let statsTimer = null
+    function updateStatsThrottled() {
+        if (statsTimer) return
+        statsTimer = setTimeout(()=> { updateStats(); statsTimer = null }, 160)
+    }
+    editor.addEventListener('input', () => {
+        updateStatsThrottled()
+    })
+
+    // 光标位置（节流）
+    let cursorTimer = null
+    function updateCursorPos() {
+        const pos = editor.selectionStart
+        const before = editor.value.substring(0, pos)
+        const line = before.split('\n').length
+        const col = pos - before.lastIndexOf('\n')
+        document.getElementById('cursorPos').textContent = `行 ${line}, 列 ${col}`
+    }
+    editor.addEventListener('keyup', ()=> { if (cursorTimer) clearTimeout(cursorTimer); cursorTimer = setTimeout(()=>{updateCursorPos(); cursorTimer=null}, 80) })
+    editor.addEventListener('click', ()=> { if (cursorTimer) clearTimeout(cursorTimer); cursorTimer = setTimeout(()=>{updateCursorPos(); cursorTimer=null}, 80) })
+
+    // 字号控制
+    const fontSizeSlider = document.getElementById('fontSizeSlider')
+    fontSizeSlider.addEventListener('input', ()=> { editor.style.fontSize = fontSizeSlider.value + 'px'; localStorage.setItem('tcm_font', fontSizeSlider.value) })
+    const saved = localStorage.getItem('tcm_font'); if (saved) { fontSizeSlider.value = saved; editor.style.fontSize = saved + 'px' }
+
+    // 页加载时尝试通过 URL 加载
+    window.addEventListener('load', loadFileFromURLAtStartup)
+    </script>
+</body>
+</html>
