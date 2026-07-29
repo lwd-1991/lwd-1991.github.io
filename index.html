@@ -438,6 +438,17 @@
             color: var(--text-light);
             margin-bottom: 15px;
         }
+        .resume-badge {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 1px 6px;
+            font-size: 0.7rem;
+            color: #C41E3A;
+            background: #FFF0F0;
+            border-radius: 3px;
+            white-space: nowrap;
+            cursor: default;
+        }
 
         .book-actions {
             display: flex;
@@ -651,6 +662,268 @@
         .donor-tag .donor-date {
             font-size: 0.75rem;
             color: #9B8969;
+        }
+
+        /* ========== Chatbot Widget ========== */
+        .chatbot-toggle {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            right: 10px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(139, 69, 19, 0.4);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            color: #FDF5E6;
+            font-size: 24px;
+        }
+
+        .chatbot-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 24px rgba(139, 69, 19, 0.5);
+        }
+
+        .chatbot-toggle .bubble-dot {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 10px;
+            height: 10px;
+            background: #FF6B6B;
+            border-radius: 50%;
+            border: 2px solid #FDF5E6;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .chatbot-panel {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            right: 80px;
+            width: 360px;
+            height: 520px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            animation: slideUp 0.3s ease;
+        }
+
+        .chatbot-panel.open {
+            display: flex;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chatbot-header {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #3D2914 100%);
+            color: #FDF5E6;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chatbot-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Ma Shan Zheng', 'STKaiti', cursive;
+            font-size: 1.1rem;
+        }
+
+        .chatbot-close {
+            background: none;
+            border: none;
+            color: #C4A77D;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .chatbot-close:hover {
+            background: rgba(196, 167, 125, 0.2);
+            color: #FDF5E6;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #FFFCF5;
+        }
+
+        .chatbot-msg {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            word-break: break-word;
+            animation: msgIn 0.25s ease;
+        }
+
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chatbot-msg.bot {
+            align-self: flex-start;
+            background: #F5EDE0;
+            color: var(--text-main);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chatbot-msg.user {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chatbot-msg.typing {
+            align-self: flex-start;
+            background: #F5EDE0;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
+        }
+
+        .chatbot-msg.typing span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-light);
+            border-radius: 50%;
+            display: inline-block;
+            animation: typingDot 1.4s infinite;
+        }
+
+        .chatbot-msg.typing span:nth-child(2) { animation-delay: 0.2s; }
+        .chatbot-msg.typing span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typingDot {
+            0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+            30% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .chatbot-input {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            background: #fff;
+        }
+
+        .chatbot-input input {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 10px 16px;
+            outline: none;
+            font-family: inherit;
+            font-size: 0.9rem;
+            background: var(--bg-paper);
+        }
+
+        .chatbot-input input:focus {
+            border-color: var(--primary);
+        }
+
+        .chatbot-input button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 1.1rem;
+        }
+
+        .chatbot-input button:hover {
+            background: var(--primary-dark);
+        }
+
+        .chatbot-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 16px 4px;
+            background: #FFFCF5;
+        }
+
+        .chatbot-suggestions button {
+            padding: 5px 12px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: #fff;
+            color: var(--text-main);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .chatbot-suggestions button:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        @media (max-width: 480px) {
+            .chatbot-panel {
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: calc(100vw - 20px);
+                height: 60vh;
+            }
+            .chatbot-toggle {
+                top: 50%;
+                transform: translateY(-50%);
+                right: 8px;
+                width: 48px;
+                height: 48px;
+                font-size: 20px;
+            }
         }
 
         /* Mobile */
@@ -2020,12 +2293,24 @@
                     const category = getCategoryName(book.name);
                     const color = getCategoryColor(category);
                     const fileName = getFileName(book);
+                    // 检查是否有阅读进度
+                    const progressKey = 'tcm_progress_' + fileName;
+                    var progressData = null;
+                    try {
+                        var raw = localStorage.getItem(progressKey);
+                        if (raw) progressData = JSON.parse(raw);
+                    } catch(e) {}
+                    var resumeBadge = '';
+                    if (progressData && progressData.percent !== undefined) {
+                        var pct = Math.min(100, Math.max(0, progressData.percent));
+                        resumeBadge = `<span class="resume-badge" title="已读 ${pct}%">${pct}%</span>`;
+                    }
                     return `
                         <div class="book-card" data-category="${category}">
                             <div class="book-content">
                                 <span class="book-number" style="background: ${color}">${String(book.num).padStart(3, '0')}</span>
                                 <div class="book-title">${book.name}</div>
-                                <div class="book-category">${category}类</div>
+                                <div class="book-category">${category}类${resumeBadge}</div>
                                 <div class="book-actions">
                                     <a href="editor.html?file=${encodeURIComponent(fileName)}" class="btn btn-edit">✏️ 编辑</a>
                                 </div>
@@ -2616,7 +2901,333 @@
                 closeGuestbook();
             }
         });
+
+        // ========== Chatbot ==========
+
+        // 建议问题列表
+        const suggestQuestions = [
+            '本站有多少本古籍？',
+            '本草类有哪些书？',
+            '什么是伤寒？',
+            '《本草纲目》是哪本？',
+            '针灸类有哪些？'
+        ];
+
+        // 知识库
+        const botKnowledge = {
+            '你好': ['你好！这里是中医古籍典藏，有什么可以帮你的？', '幸会！欢迎来到古籍宝库 📖'],
+            '本草': [
+                '本草类是中药学经典，本站收录了《神农本草经》《本草纲目》《本草备要》等47部本草著作。',
+                '本草类典籍包括《神农本草经》《本草纲目》《本草从新》《本草求真》等，是中药学的根本。'
+            ],
+            '伤寒': [
+                '伤寒类以张仲景《伤寒论》为核心，本站收录了《伤寒论》《注解伤寒论》《伤寒贯珠集》等40余部伤寒学著作。',
+                '伤寒学说是中医辨证论治的基石，本站收录了从古至今的伤寒类典籍，包括《伤寒论条辨》《伤寒溯源集》等。'
+            ],
+            '金匮': [
+                '金匮类以《金匮要略》为核心，本站收录了《金匮要略方论》《金匮要略心典》《金匮翼》等。',
+                '《金匮要略》是张仲景论述杂病的经典，本站收录了《金匮要略浅注》《金匮玉函经二注》等注疏。'
+            ],
+            '内经': [
+                '内经类是中医理论的源头，包括《黄帝内经素问》《灵枢经》《难经》等，本站收录了35部内经类典籍。',
+                '本站收录了《黄帝内经素问》《黄帝内经太素》《类经》《内经知要》等内经类经典著作。'
+            ],
+            '方书': [
+                '方书类是中医方剂的宝库，本站收录了《肘后备急方》《千金要方》《普济方》《医方集解》等90余部方书。',
+                '方书类很丰富！从最早的《五十二病方》到清代《验方新编》，本站共收录90多部方书。'
+            ],
+            '女科': [
+                '女科类专注妇科疾患，本站收录了《妇人大全良方》《傅青主女科》《济阴纲目》《女科经纶》等。',
+                '女科典籍也是本站的特色馆藏，有《产宝》《女科百问》《竹林女科证治》等50余部。'
+            ],
+            '儿科': [
+                '儿科类有《小儿药证直诀》《幼幼集成》《幼科发挥》等，本站收录了50余部儿科典籍。',
+                '本站儿科馆藏丰富，包括《婴儿论》《活幼心书》《幼科铁镜》《保婴撮要》等。'
+            ],
+            '外科': [
+                '外科类包括《外科正宗》《外科大成》《疡医大全》《伤科补要》等，本站收录了50余部。',
+                '中医外科历史悠久，本站有《外科精义》《立斋外科发挥》《正体类要》等典籍。'
+            ],
+            '针灸': [
+                '针灸类有《针灸甲乙经》《针灸大成》《针灸聚英》《针灸资生经》等，本站收录了30余部。',
+                '从《黄帝明堂灸经》到《针灸逢源》，本站的针灸类典籍贯穿千年经络学说。'
+            ],
+            '眼科': [
+                '眼科类包括《审视瑶函》《银海精微》《目经大成》《原机启微》等。',
+                '中医眼科典籍本站有30余部，如《眼科秘诀》《异授眼科》《秘传眼科龙木论》等。'
+            ],
+            '医案': [
+                '医案类记载了历代名医临证经验，本站有《临证指南医案》《古今医案按》《丁甘仁医案》等。',
+                '本站医案收藏丰富，叶天士、吴鞠通、王旭高等大师的医案皆有收录。'
+            ],
+            '医论': [
+                '医论类是最庞大的类别，涵盖了中医基础理论、各家学说、辨证方法等，本站收录了200余部。',
+                '《医宗金鉴》《景岳全书》《医学衷中参西录》《医林改错》等都在此列。'
+            ],
+            '本草纲目': ['《本草纲目》是明代李时珍的巨著，收录药物1892种，附方11096首，本站有完整文本，编号013。'],
+            '神农本草经': ['《神农本草经》是现存最早的中药学专著，收录药物365种，本站编号000，完全收录。'],
+            '黄帝内经': ['《黄帝内经》是中医理论的奠基之作，包括《素问》81篇和《灵枢》81篇，本站编号437。'],
+            '伤寒论': ['《伤寒论》是张仲景所著中医辨证论治经典，本站编号457，另有多种注疏版本。'],
+            '金匮要略': ['《金匮要略》是张仲景论杂病的经典，本站编号499，另有多种注疏。'],
+            '针灸大成': ['《针灸大成》是明代杨继洲所著，汇集历代针灸精华，本站编号299。'],
+            '总计': ['本站共收录中医药古籍701部，涵盖本草、伤寒、金匮、内经、方书、女科、儿科、外科、针灸、眼科、医案、医论等12大门类。'],
+            '多少': ['本站共收录701部中医药古籍，12大门类。你可以在上方分类按钮中按类别浏览。'],
+            '帮助': ['你可以这样问我：\n📚 查古籍、🔍 搜分类、📖 了解中医经典、🆘 使用帮助'],
+            '谢谢': ['不客气！祝你研读愉快 📖', '随时问我~ 愿中医智慧伴你左右 🏮'],
+            '再见': ['再见！欢迎常来古籍典藏 🏮', '后会有期，愿岐黄之术薪火相传 📚']
+        };
+
+        // 书籍名称索引
+        const bookNameIndex = [];
+        booksData.forEach(function(b) {
+            bookNameIndex.push(b.name.replace(/[《》\s]/g, ''));
+        });
+
+        // 显示建议问题
+        function showSuggestions() {
+            var container = document.getElementById('chatbotSuggestions');
+            container.innerHTML = suggestQuestions.map(function(q) {
+                return '<button onclick="useSuggestion(\'' + q.replace(/'/g, "\\'") + '\')">' + q + '</button>';
+            }).join('');
+        }
+        showSuggestions();
+
+        function useSuggestion(text) {
+            document.getElementById('chatbotInput').value = text;
+            sendChatbotMsg();
+        }
+
+        // 切换面板
+        function toggleChatbot() {
+            var panel = document.getElementById('chatbotPanel');
+            var isOpen = panel.classList.toggle('open');
+            if (isOpen) {
+                document.getElementById('chatbotInput').focus();
+                // 滚动到底部
+                var msgs = document.getElementById('chatbotMessages');
+                msgs.scrollTop = msgs.scrollHeight;
+            }
+        }
+
+        // 查找古籍
+        function searchBook(query) {
+            var results = [];
+            for (var i = 0; i < booksData.length; i++) {
+                var b = booksData[i];
+                if (b.name.indexOf(query) !== -1 || (query.length >= 2 && b.name.includes(query))) {
+                    results.push(b);
+                }
+            }
+            return results;
+        }
+
+        // 获取类别下的书籍列表摘要
+        function getBooksByCategory(catName) {
+            var names = [];
+            for (var i = 0; i < booksData.length; i++) {
+                var cat = getCategoryName(booksData[i].name);
+                if (cat === catName) {
+                    names.push(booksData[i].name);
+                }
+            }
+            return names;
+        }
+
+        // 主要回答逻辑
+        function getBotReply(input) {
+            var text = input.replace(/[《》「」『』\s？?，,。.!！、：:]/g, '').trim();
+            if (!text) return '请说点什么吧~';
+
+            // 1. 精确匹配知识库
+            for (var key in botKnowledge) {
+                if (text.indexOf(key) !== -1) {
+                    var replies = botKnowledge[key];
+                    return replies[Math.floor(Math.random() * replies.length)];
+                }
+            }
+
+            // 2. 模糊匹配书籍名称
+            for (var i = 0; i < bookNameIndex.length; i++) {
+                if (text.indexOf(bookNameIndex[i]) !== -1 || bookNameIndex[i].indexOf(text) !== -1) {
+                    var book = booksData[i];
+                    var cat = getCategoryName(book.name);
+                    return '《' + book.name + '》编号 ' + String(book.num).padStart(3, '0') + '，属于「' + cat + '」类。你可以点击上方的分类筛选，或使用搜索功能查找。';
+                }
+            }
+
+            // 3. 关于数量的特殊回应
+            if (text.indexOf('多少') !== -1 || text.indexOf('几本') !== -1 || text.indexOf('数量') !== -1) {
+                var cat = '';
+                for (var c in {'本草':1,'伤寒':1,'金匮':1,'内经':1,'方书':1,'女科':1,'儿科':1,'外科':1,'针灸':1,'眼科':1,'医案':1,'医论':1}) {
+                    if (text.indexOf(c) !== -1) { cat = c; break; }
+                }
+                if (cat && botKnowledge[cat]) {
+                    return botKnowledge[cat][0];
+                }
+                return '本站共收录中医药古籍 ' + booksData.length + ' 部，涵盖12大门类。';
+            }
+
+            // 4. 搜索书籍
+            if (text.indexOf('找') !== -1 || text.indexOf('搜索') !== -1 || text.indexOf('查') !== -1) {
+                var searchTerm = text.replace(/找|搜索|查|一下|看看/g, '').trim();
+                if (searchTerm) {
+                    var found = searchBook(searchTerm);
+                    if (found.length > 0) {
+                        var list = found.map(function(b) { return '《' + b.name + '》'; }).join('、');
+                        return '找到了 ' + found.length + ' 部相关古籍：' + list;
+                    } else {
+                        return '没有找到包含「' + searchTerm + '」的古籍，试试换个关键词？';
+                    }
+                }
+            }
+
+            // 5. 默认回复
+            var defaultReplies = [
+                '好问题！你可以试试在搜索框中输入关键词查找相关古籍。',
+                '这涉及中医的深邃领域，本站有701部古籍可供参考。',
+                '你可以问我某个具体分类（如"本草类"）或某本古籍的名字。',
+                '输入「帮助」查看我可以回答哪些问题~',
+                '🔍 在页面顶部搜索框可以直接搜索古籍名称。'
+            ];
+            return defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
+        }
+
+        // OpenClaw AI 聊天 API
+        // 本地开发: http://127.0.0.1:3456/api/chat
+        // 生产: cloudflared 隧道地址
+
+        // 发送消息到 OpenClaw AI
+        function sendChatbotMsg() {
+            var input = document.getElementById('chatbotInput');
+            var text = input.value.trim();
+            if (!text) return;
+
+            var msgsDiv = document.getElementById('chatbotMessages');
+
+            // 显示用户消息
+            msgsDiv.innerHTML += '<div class="chatbot-msg user">' + escapeHtml(text) + '</div>';
+            input.value = '';
+            msgsDiv.scrollTop = msgsDiv.scrollHeight;
+
+            // 显示打字指示
+            msgsDiv.innerHTML += '<div class="chatbot-msg typing" id="typingIndicator"><span></span><span></span><span></span></div>';
+            msgsDiv.scrollTop = msgsDiv.scrollHeight;
+
+            // 发送请求
+            try {
+                fetch('http://127.0.0.1:3456/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                }).then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return readSSEStream(response);
+                }).then(function(fullText) {
+                    removeTyping();
+                    if (fullText) {
+                        appendBotMsg(fullText);
+                    }
+                }).catch(function(err) {
+                    removeTyping();
+                    appendBotMsg('抱歉，AI 助手暂时无法连接。<br><small>错误：' + escapeHtml(err.message) + '</small>');
+                });
+            } catch (e) {
+                removeTyping();
+                appendBotMsg('抱歉，发送失败。');
+            }
+        }
+
+        // 读取 SSE 流
+        function readSSEStream(response) {
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = '';
+            var fullText = '';
+
+            function process() {
+                return reader.read().then(function(result) {
+                    if (result.done) return fullText;
+                    buffer += decoder.decode(result.value, { stream: true });
+                    // 解析 SSE 行
+                    var lines = buffer.split('\n');
+                    buffer = lines.pop() || '';  // 最后一行可能不完整
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        if (line.startsWith('data: ')) {
+                            try {
+                                var data = JSON.parse(line.substring(6));
+                                if (data.type === 'text' && data.text) {
+                                    fullText += data.text;
+                                    updateStreamingText(fullText);
+                                } else if (data.type === 'status' && data.text) {
+                                    updateStreamingText(fullText + '<br><small>⏳ ' + escapeHtml(data.text) + '</small>');
+                                } else if (data.type === 'done') {
+                                    fullText = data.text || fullText;
+                                    return fullText;
+                                }
+                            } catch(e) {}
+                        }
+                    }
+                    return process();  // 继续读取
+                });
+            }
+
+            return process();
+        }
+
+        // 实时更新流式文本
+        function updateStreamingText(text) {
+            removeTyping();
+            var msgsDiv = document.getElementById('chatbotMessages');
+            var streaming = document.getElementById('streamingMsg');
+            if (streaming) {
+                streaming.innerHTML = text.replace(/\n/g, '<br>');
+            } else {
+                msgsDiv.innerHTML += '<div class="chatbot-msg bot" id="streamingMsg">' + text.replace(/\n/g, '<br>') + '</div>';
+            }
+            msgsDiv.scrollTop = msgsDiv.scrollHeight;
+        }
+
+        // 添加完整的机器人回复
+        function appendBotMsg(text) {
+            var msgsDiv = document.getElementById('chatbotMessages');
+            var streaming = document.getElementById('streamingMsg');
+            if (streaming) streaming.remove();
+            msgsDiv.innerHTML += '<div class="chatbot-msg bot">' + text.replace(/\n/g, '<br>') + '</div>';
+            msgsDiv.scrollTop = msgsDiv.scrollHeight;
+        }
+
+        // 移除打字指示器
+        function removeTyping() {
+            var typing = document.getElementById('typingIndicator');
+            if (typing) typing.remove();
+        }
     </script>
+
+    <!-- Chatbot Widget -->
+    <button class="chatbot-toggle" id="chatbotToggle" onclick="toggleChatbot()" title="线上小助手">
+        📖
+        <span class="bubble-dot"></span>
+    </button>
+
+    <div class="chatbot-panel" id="chatbotPanel">
+        <div class="chatbot-header">
+            <div class="chatbot-header-title">📖 线上小助手</div>
+            <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
+        </div>
+        <div class="chatbot-messages" id="chatbotMessages">
+            <div class="chatbot-msg bot">
+                聊聊呗！星空有你，聊啥都行！
+            </div>
+        </div>
+        <div class="chatbot-suggestions" id="chatbotSuggestions"></div>
+        <div class="chatbot-input">
+            <input type="text" id="chatbotInput" placeholder="输入问题..." onkeydown="if(event.key==='Enter') sendChatbotMsg()">
+            <button onclick="sendChatbotMsg()">➤</button>
+        </div>
+    </div>
 
     <!-- Guestbook Modal -->
     <div class="guestbook-modal" id="guestbookModal">
