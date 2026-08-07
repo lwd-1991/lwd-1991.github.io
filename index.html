@@ -752,6 +752,17 @@
             font-size: 1.1rem;
         }
 
+        .chatbot-mode-badge {
+            font-family: 'Noto Serif SC', 'STSong', serif;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(100, 200, 100, 0.25);
+            color: #8FDC8F;
+            letter-spacing: 0;
+            transition: all 0.3s;
+        }
+
         .chatbot-close {
             background: none;
             border: none;
@@ -2904,89 +2915,295 @@
 
         // ========== Chatbot ==========
 
-        // 建议问题列表
-        const suggestQuestions = [
-            '本站有多少本古籍？',
-            '本草类有哪些书？',
-            '什么是伤寒？',
-            '《本草纲目》是哪本？',
-            '针灸类有哪些？'
+        // 聊天上下文记忆
+        const chatHistory = [];
+        const MAX_HISTORY = 10;
+        let chatMode = 'api'; // 'api' | 'local' | 'offline'
+        const AI_TIMEOUT = 15000; // API 超时 ms
+
+        // 建议问题池
+        const allSuggestions = [
+            '本站有多少本古籍？', '本草类有哪些书？', '什么是阴阳五行？',
+            '介绍《本草纲目》', '四诊是什么？', '人参的功效？',
+            '四君子汤是什么？', '《黄帝内经》是什么？', '针灸类有哪些？',
+            '什么是经络？', '伤寒论的内容？', '方书类有多少本？'
         ];
 
-        // 知识库
-        const botKnowledge = {
-            '你好': ['你好！这里是中医古籍典藏，有什么可以帮你的？', '幸会！欢迎来到古籍宝库 📖'],
-            '本草': [
-                '本草类是中药学经典，本站收录了《神农本草经》《本草纲目》《本草备要》等47部本草著作。',
-                '本草类典籍包括《神农本草经》《本草纲目》《本草从新》《本草求真》等，是中药学的根本。'
-            ],
-            '伤寒': [
-                '伤寒类以张仲景《伤寒论》为核心，本站收录了《伤寒论》《注解伤寒论》《伤寒贯珠集》等40余部伤寒学著作。',
-                '伤寒学说是中医辨证论治的基石，本站收录了从古至今的伤寒类典籍，包括《伤寒论条辨》《伤寒溯源集》等。'
-            ],
-            '金匮': [
-                '金匮类以《金匮要略》为核心，本站收录了《金匮要略方论》《金匮要略心典》《金匮翼》等。',
-                '《金匮要略》是张仲景论述杂病的经典，本站收录了《金匮要略浅注》《金匮玉函经二注》等注疏。'
-            ],
-            '内经': [
-                '内经类是中医理论的源头，包括《黄帝内经素问》《灵枢经》《难经》等，本站收录了35部内经类典籍。',
-                '本站收录了《黄帝内经素问》《黄帝内经太素》《类经》《内经知要》等内经类经典著作。'
-            ],
-            '方书': [
-                '方书类是中医方剂的宝库，本站收录了《肘后备急方》《千金要方》《普济方》《医方集解》等90余部方书。',
-                '方书类很丰富！从最早的《五十二病方》到清代《验方新编》，本站共收录90多部方书。'
-            ],
-            '女科': [
-                '女科类专注妇科疾患，本站收录了《妇人大全良方》《傅青主女科》《济阴纲目》《女科经纶》等。',
-                '女科典籍也是本站的特色馆藏，有《产宝》《女科百问》《竹林女科证治》等50余部。'
-            ],
-            '儿科': [
-                '儿科类有《小儿药证直诀》《幼幼集成》《幼科发挥》等，本站收录了50余部儿科典籍。',
-                '本站儿科馆藏丰富，包括《婴儿论》《活幼心书》《幼科铁镜》《保婴撮要》等。'
-            ],
-            '外科': [
-                '外科类包括《外科正宗》《外科大成》《疡医大全》《伤科补要》等，本站收录了50余部。',
-                '中医外科历史悠久，本站有《外科精义》《立斋外科发挥》《正体类要》等典籍。'
-            ],
-            '针灸': [
-                '针灸类有《针灸甲乙经》《针灸大成》《针灸聚英》《针灸资生经》等，本站收录了30余部。',
-                '从《黄帝明堂灸经》到《针灸逢源》，本站的针灸类典籍贯穿千年经络学说。'
-            ],
-            '眼科': [
-                '眼科类包括《审视瑶函》《银海精微》《目经大成》《原机启微》等。',
-                '中医眼科典籍本站有30余部，如《眼科秘诀》《异授眼科》《秘传眼科龙木论》等。'
-            ],
-            '医案': [
-                '医案类记载了历代名医临证经验，本站有《临证指南医案》《古今医案按》《丁甘仁医案》等。',
-                '本站医案收藏丰富，叶天士、吴鞠通、王旭高等大师的医案皆有收录。'
-            ],
-            '医论': [
-                '医论类是最庞大的类别，涵盖了中医基础理论、各家学说、辨证方法等，本站收录了200余部。',
-                '《医宗金鉴》《景岳全书》《医学衷中参西录》《医林改错》等都在此列。'
-            ],
-            '本草纲目': ['《本草纲目》是明代李时珍的巨著，收录药物1892种，附方11096首，本站有完整文本，编号013。'],
-            '神农本草经': ['《神农本草经》是现存最早的中药学专著，收录药物365种，本站编号000，完全收录。'],
-            '黄帝内经': ['《黄帝内经》是中医理论的奠基之作，包括《素问》81篇和《灵枢》81篇，本站编号437。'],
-            '伤寒论': ['《伤寒论》是张仲景所著中医辨证论治经典，本站编号457，另有多种注疏版本。'],
-            '金匮要略': ['《金匮要略》是张仲景论杂病的经典，本站编号499，另有多种注疏。'],
-            '针灸大成': ['《针灸大成》是明代杨继洲所著，汇集历代针灸精华，本站编号299。'],
-            '总计': ['本站共收录中医药古籍701部，涵盖本草、伤寒、金匮、内经、方书、女科、儿科、外科、针灸、眼科、医案、医论等12大门类。'],
-            '多少': ['本站共收录701部中医药古籍，12大门类。你可以在上方分类按钮中按类别浏览。'],
-            '帮助': ['你可以这样问我：\n📚 查古籍、🔍 搜分类、📖 了解中医经典、🆘 使用帮助'],
-            '谢谢': ['不客气！祝你研读愉快 📖', '随时问我~ 愿中医智慧伴你左右 🏮'],
-            '再见': ['再见！欢迎常来古籍典藏 🏮', '后会有期，愿岐黄之术薪火相传 📚']
+        // ========== 分类知识库 ==========
+        const catInfo = {
+            '本草': { count: 47, desc: '中药学经典，从《神农本草经》到清代《本草问答》，涵盖药物性味、归经、功效、炮制等。本站收录47部。代表：《神农本草经》《本草纲目》《本草备要》《本草从新》。'},
+            '伤寒': { count: 40, desc: '以张仲景《伤寒论》为核心的外感病辨证体系。本站收录40余部，涵盖原文、注解、方论、临床发挥等。代表：《伤寒论》《注解伤寒论》《伤寒贯珠集》《伤寒来苏集》。'},
+            '金匮': { count: 25, desc: '以《金匮要略》为核心的杂病论治体系。本站收录25部，含原文及各家注疏。代表：《金匮要略方论》《金匮要略心典》《金匮翼》。'},
+            '内经': { count: 35, desc: '中医理论源头，包括《素问》《灵枢》《难经》及历代注家。代表：《黄帝内经素问》《灵枢经》《类经》《内经知要》。'},
+            '方书': { count: 90, desc: '中医方剂学宝库，收录历代验方、成方、秘方。从《五十二病方》到《验方新编》，涵盖内、外、妇、儿各科。代表：《千金要方》《外台秘要》《普济方》《医方集解》《汤头歌诀》。'},
+            '女科': { count: 50, desc: '妇科专著，涵盖经、带、胎、产、杂病。代表：《妇人大全良方》《傅青主女科》《济阴纲目》《女科经纶》《竹林女科证治》。'},
+            '儿科': { count: 50, desc: '儿科典籍，含小儿诊法、方药、推拿、痘疹等。代表：《小儿药证直诀》《幼幼集成》《幼科发挥》《幼科铁镜》《麻科活人全书》。'},
+            '外科': { count: 50, desc: '中医外科、伤科、疮疡科典籍。代表：《外科正宗》《外科大成》《疡医大全》《仙授理伤续断秘方》《正体类要》。'},
+            '针灸': { count: 30, desc: '针灸经络经典，涵盖腧穴、刺法、灸法、经络理论。代表：《针灸甲乙经》《针灸大成》《针灸聚英》《针灸资生经》《针灸逢源》。'},
+            '眼科': { count: 30, desc: '中医眼科专著，涵盖五轮八廓学说、眼病辨证论治。代表：《审视瑶函》《银海精微》《目经大成》《原机启微》。'},
+            '医案': { count: 60, desc: '历代名医临证实录，是临床经验的珍贵记录。代表：《临证指南医案》《古今医案按》《续名医类案》《丁甘仁医案》。'},
+            '医论': { count: 200, desc: '最大的类别，涵盖基础理论、各家学说、辨证方法、养生、医史等。代表：《景岳全书》《医宗金鉴》《医学衷中参西录》《医林改错》《血证论》。'}
         };
 
-        // 书籍名称索引
-        const bookNameIndex = [];
-        booksData.forEach(function(b) {
-            bookNameIndex.push(b.name.replace(/[《》\s]/g, ''));
-        });
+        // ========== 名著详解 ==========
+        const famousBooks = {
+            '神农本草经': '现存最早的中药学专著，约成书于汉代，托名神农。载药365种，分上中下三品，创立四气五味理论。本站编号000。',
+            '本草纲目': '明代李时珍历时27年编成（1590年）。载药1892种，附方11096首，附图1109幅，被誉为"东方药学巨典"。本站编号013。',
+            '黄帝内经': '中医理论奠基之作，约成书于战国至汉代。包括《素问》81篇和《灵枢》81篇，系统论述阴阳五行、脏腑经络、病因病机、诊法治则。本站编号437。',
+            '伤寒论': '东汉张仲景著（约200年），创立六经辨证体系。原书10卷22篇，载113方。与《金匮要略》合称《伤寒杂病论》，是中医学辨证论治的典范。本站编号457。',
+            '金匮要略': '东汉张仲景著，论述内伤杂病。共25篇，载262方，首创脏腑经络辨证。本站编号499。',
+            '千金要方': '唐代孙思邈著（652年），30卷，载方5300余首。主张"大医精诚"，融儒释道医为一体。本站编号053。',
+            '针灸大成': '明代杨继洲编著（1601年），10卷，汇辑历代针灸精华，是针灸学的集大成之作。本站编号299。',
+            '医宗金鉴': '清代吴谦等奉敕编纂（1742年），90卷，是清太医院教科书。内容涵盖伤寒、金匮、各科心法要诀。本站编号260。',
+            '温病条辨': '清代吴鞠通著（1798年），创立三焦辨证，是温病学重要经典。本站编号288。',
+            '景岳全书': '明代张介宾（景岳）著，64卷。倡导"阳非有余，真阴不足"论，创制左归丸、右归丸等名方。本站编号294。',
+            '傅青主女科': '明末清初傅山著，分上下卷，论述妇科经带胎产杂病，辨证精确，方药简效。本站编号124（歌括）。',
+            '小儿药证直诀': '宋代钱乙（约1119年）著，儿科鼻祖之作。创立五脏辨证，提出"脏腑柔弱，易虚易实"理论。本站编号133。',
+            '外科正宗': '明代陈实功著（1617年），4卷，系统论述外科病证，强调内外兼治。本站编号230。',
+            '审视瑶函': '明代傅仁宇著（1644年），6卷，又名《眼科大全》，是中医眼科重要著作。本站编号265。',
+            '临证指南医案': '清代叶天士著，10卷，收录叶氏临证医案，辨证精微，用药灵活。本站编号308。',
+            '难经': '原名《黄帝八十一难经》，传为扁鹊（秦越人）著。以问答形式阐释《内经》疑难，共八十一难。本站编号438。',
+            '雷公炮炙论': '南朝雷敩著，我国最早的中药炮制学专著，记载300种药物的炮制方法。本站编号039。',
+            '肘后备急方': '晋代葛洪著，8卷，收录简便验方，是我国第一部临床急救手册。本站编号075。',
+            '外台秘要': '唐代王焘编（752年），40卷，汇集唐以前69家医方，1104门，载方6000余首。本站编号055。',
+            '普济方': '明代朱橚等编（1406年），168卷，载方61739首，是古代最大的方书。本站编号074。',
+            '医林改错': '清代王清任著（1830年），纠正古代解剖错误，创立补阳还五汤等活血化瘀名方。本站编号204。',
+            '医学衷中参西录': '近代张锡纯著（1909年），中西汇通代表作，创制镇肝熄风汤、升陷汤等名方。本站编号238。'
+        };
 
-        // 显示建议问题
+        // ========== 中医基础理论 ==========
+        const theoryDB = {
+            '阴阳五行': '阴阳学说和五行学说是中医理论的核心。阴阳代表事物对立统一的两个方面（如寒热、虚实、表里）；五行（木火土金水）对应五脏（肝心脾肺肾），以生克乘侮关系解释生理病理。',
+            '脏腑': '中医将内脏分为五脏（心肝脾肺肾）、六腑（胆小肠胃大肠膀胱三焦）和奇恒之腑。五脏主藏精气，六腑主传化物。脏腑之间通过经络相互联系，构成有机整体。',
+            '经络': '经络是运行气血、联络脏腑肢节的通道系统。包括十二正经、奇经八脉、十五络脉等。经络学说指导针灸、推拿、方药归经等临床实践。',
+            '气血津液': '气是生命活动的动力（元气、宗气、营气、卫气）；血是濡养全身的物质基础；津液是体内正常水液的总称。气血津液相互化生、相互依存。',
+            '病因病机': '病因分三类：外因（六淫：风寒暑湿燥火）、内因（七情：喜怒忧思悲恐惊）、不内外因（饮食劳倦、外伤虫兽）。病机是疾病发生发展的机理。',
+            '四诊': '望闻问切，中医诊断四法。望诊：观察神色形态舌象；闻诊：听声音嗅气味；问诊：询问病史症状；切诊：切脉按腹。四诊合参，辨证论治。',
+            '八纲辨证': '八纲：阴阳、表里、寒热、虚实。阴阳为总纲（表、热、实属阳；里、寒、虚属阴），是中医辨证的基础框架。',
+            '六经辨证': '张仲景创立的辨证方法，将外感病分为太阳、阳明、少阳、太阴、少阴、厥阴六经病证，反映疾病由表入里、由浅入深的过程。',
+            '卫气营血辨证': '清代叶天士创立，用于温病辨证。卫分（表证）、气分（里热）、营分（热入营阴）、血分（热入血分），反映温病传变规律。',
+            '治则治法': '中医八大治法：汗（发汗解表）、吐（涌吐）、下（攻下）、和（和解）、温（温里）、清（清热）、补（补益）、消（消导）。另有活血化瘀、化痰止咳等具体治法。'
+        };
+
+        // ========== 常用中药 ==========
+        const herbDB = {
+            '人参': '甘微苦温，归脾肺心经。大补元气，复脉固脱，补脾益肺，生津安神。为补气第一要药。',
+            '黄芪': '甘温，归脾肺经。补气升阳，固表止汗，利水消肿，托毒生肌。与当归配伍为当归补血汤。',
+            '当归': '甘辛温，归肝心脾经。补血活血，调经止痛，润肠通便。妇科要药，为"血中圣药"。',
+            '甘草': '甘平，归心脾肺胃经。补脾益气，清热解毒，祛痰止咳，缓急止痛，调和诸药。',
+            '桂枝': '辛甘温，归心肺膀胱经。发汗解肌，温通经脉，助阳化气。桂枝汤为群方之首。',
+            '麻黄': '辛微苦温，归肺膀胱经。发汗解表，宣肺平喘，利水消肿。为发汗第一要药。',
+            '柴胡': '苦辛微寒，归肝胆经。疏散退热，疏肝解郁，升举阳气。小柴胡汤主药。',
+            '黄芩': '苦寒，归肺胆脾胃大小肠经。清热燥湿，泻火解毒，止血安胎。',
+            '黄连': '苦寒，归心脾胃肝胆大肠经。清热燥湿，泻火解毒。善清中焦湿热、心胃实火。',
+            '大黄': '苦寒，归脾胃大肠肝心经。泻下攻积，清热泻火，凉血解毒，逐瘀通经。',
+            '附子': '辛甘大热，有毒，归心肾脾经。回阳救逆，补火助阳，散寒止痛。为"回阳救逆第一品药"。',
+            '茯苓': '甘淡平，归心脾肾经。利水渗湿，健脾宁心。四君子汤四药之一。',
+            '白术': '甘苦温，归脾胃经。补气健脾，燥湿利水，止汗安胎。为健脾要药。',
+            '熟地': '甘微温，归肝肾经。补血滋阴，益精填髓。四物汤、六味地黄丸主药。',
+            '白芍': '苦酸微寒，归肝脾经。养血调经，柔肝止痛，敛阴止汗。',
+            '川芎': '辛温，归肝胆心包经。活血行气，祛风止痛。为"血中气药"，治头痛要药。',
+            '丹参': '苦微寒，归心肝经。活血祛瘀，通经止痛，清心除烦，凉血消痈。',
+            '枸杞': '甘平，归肝肾经。滋补肝肾，益精明目。',
+            '菊花': '甘苦微寒，归肺肝经。疏散风热，平肝明目，清热解毒。',
+            '半夏': '辛温有毒，归脾胃肺经。燥湿化痰，降逆止呕，消痞散结。二陈汤主药。'
+        };
+
+        // ========== 常用方剂 ==========
+        const formulaDB = {
+            '四君子汤': '组成：人参、白术、茯苓、甘草。功效：益气健脾。主治：脾胃气虚证。为补气基础方。',
+            '四物汤': '组成：熟地、当归、白芍、川芎。功效：补血调血。主治：营血虚滞证。为补血基础方，妇科要方。',
+            '八珍汤': '组成：四君子汤+四物汤（加姜枣）。功效：益气补血。主治：气血两虚证。',
+            '六味地黄丸': '组成：熟地、山茱萸、山药、泽泻、茯苓、丹皮。功效：滋补肾阴。主治：肾阴虚证。三补三泻，补而不滞。',
+            '小柴胡汤': '组成：柴胡、黄芩、人参、半夏、甘草、生姜、大枣。功效：和解少阳。主治：伤寒少阳证。柴胡类方之祖。',
+            '桂枝汤': '组成：桂枝、白芍、生姜、大枣、甘草。功效：解肌发表，调和营卫。主治：外感风寒表虚证。被誉"群方之冠"。',
+            '麻黄汤': '组成：麻黄、桂枝、杏仁、甘草。功效：发汗解表，宣肺平喘。主治：外感风寒表实证。',
+            '白虎汤': '组成：石膏、知母、甘草、粳米。功效：清热生津。主治：阳明气分热盛证（大热、大渴、大汗、脉洪大）。',
+            '大承气汤': '组成：大黄、厚朴、枳实、芒硝。功效：峻下热结。主治：阳明腑实证（痞满燥实）。',
+            '补中益气汤': '组成：黄芪、人参、白术、甘草、当归、陈皮、升麻、柴胡。功效：补中益气，升阳举陷。金元李东垣创制。',
+            '逍遥散': '组成：柴胡、当归、白芍、白术、茯苓、甘草、薄荷、煨姜。功效：疏肝解郁，养血健脾。主治：肝郁血虚证。',
+            '归脾汤': '组成：人参、黄芪、白术、茯神、当归、龙眼肉、酸枣仁、远志、木香、甘草。功效：益气补血，健脾养心。主治：心脾两虚、脾不统血。',
+            '温胆汤': '组成：半夏、竹茹、枳实、陈皮、茯苓、甘草、生姜、大枣。功效：理气化痰，清胆和胃。主治：胆胃不和，痰热内扰。',
+            '独活寄生汤': '组成：独活、桑寄生、杜仲、牛膝、细辛、秦艽、茯苓、肉桂、防风、川芎、人参、甘草、当归、芍药、干地黄。功效：祛风湿，止痹痛，益肝肾，补气血。',
+            '银翘散': '组成：金银花、连翘、桔梗、薄荷、竹叶、荆芥、淡豆豉、牛蒡子、甘草。功效：辛凉透表，清热解毒。温病代表方。'
+        };
+
+        // ========== 常见病症中医解读 ==========
+        const conditionDB = {
+            '感冒': '中医分风寒感冒（恶寒重、发热轻、鼻塞流清涕，方用荆防败毒散）和风热感冒（发热重、咽痛、流黄涕，方用银翘散）。另有暑湿感冒、气虚感冒等。',
+            '咳嗽': '分外感咳嗽（风寒、风热、风燥）和内伤咳嗽（痰湿、痰热、肝火、阴虚）。"五脏六腑皆令人咳，非独肺也"——《素问》。',
+            '头痛': '分外感头痛（风寒、风热、风湿）和内伤头痛（肝阳、肾虚、血虚、痰浊、瘀血）。按部位分经：前额属阳明，两侧属少阳，后枕属太阳，巅顶属厥阴。',
+            '失眠': '中医称"不寐"，病机为阳不入阴。分型：心脾两虚（归脾汤）、阴虚火旺（黄连阿胶汤）、肝郁化火（龙胆泻肝汤）、痰热内扰（温胆汤）、心胆气虚（安神定志丸）。',
+            '胃痛': '分寒邪客胃（良附丸）、饮食停滞（保和丸）、肝气犯胃（柴胡疏肝散）、肝胃郁热（化肝煎）、瘀血停滞（失笑散合丹参饮）、胃阴亏虚（一贯煎）、脾胃虚寒（黄芪建中汤）。',
+            '便秘': '分实秘（热秘用麻子仁丸、气秘用六磨汤、冷秘用温脾汤）和虚秘（气虚用黄芪汤、血虚用润肠丸、阴虚用增液汤、阳虚用济川煎）。',
+            '月经不调': '包括月经先期、后期、先后不定期、月经过多、过少等。常见证型：气虚（归脾汤）、血虚（四物汤）、血热（清经散）、血寒（温经汤）、肝郁（逍遥散）、肾虚（归肾丸）。',
+            '腰痛': '分寒湿腰痛（甘姜苓术汤）、湿热腰痛（四妙丸）、瘀血腰痛（身痛逐瘀汤）、肾虚腰痛（肾阴虚用左归丸，肾阳虚用右归丸）。',
+            '高血压': '中医属"眩晕""头痛"范畴。常见证型：肝阳上亢（天麻钩藤饮）、阴虚阳亢（杞菊地黄丸）、痰湿中阻（半夏白术天麻汤）、阴阳两虚（二仙汤）。',
+            '糖尿病': '中医称"消渴"，分上消（肺热津伤，消渴方）、中消（胃热炽盛，玉女煎）、下消（肾阴亏虚，六味地黄丸；阴阳两虚，金匮肾气丸）。'
+        };
+
+        // ========== 意图匹配 & 回答引擎 ==========
+        function getBotReply(input) {
+            var raw = input.trim();
+            var text = raw.replace(/[《》「」『』\s？?，,。.!！、：:；;\""''()（）\[\]【】]/g, '');
+            if (!text) return '请说点什么吧~';
+
+            // 记录上下文
+            addToHistory('user', raw);
+
+            // ====== Layer 1: 寒暄 ======
+            if (/^(你好|hi|hello|嗨|在吗|有人在吗)/i.test(text)) {
+                return pick(['你好！这里是中医古籍典藏 📚 有什么可以帮你的？', '幸会！欢迎来到古籍宝库，随便问~', '您好！我是线上小助手，中医古籍、基础理论都可以问我~']);
+            }
+            if (/^(谢谢|多谢|感谢|thanks)/i.test(text)) {
+                return pick(['不客气！研读愉快 📖', '随时问我~ 🏮', '岐黄之术，薪火相传 📚']);
+            }
+            if (/^(再见|拜拜|bye|88)/i.test(text)) {
+                return pick(['再见！欢迎常来 🏮', '后会有期，愿岐黄之术护佑健康 📚', '告辞！随时回来翻书~']);
+            }
+            if (/(帮助|help|能做什么|怎么用|功能)/i.test(text)) {
+                return '我是中医古籍小助手，我可以：\n📚 查古籍信息（如"介绍《本草纲目》"）\n📂 浏览分类（如"针灸类有哪些"）\n📊 统计数量（如"方书类多少本"）\n💊 了解中药（如"人参的功效"）\n🧪 查方剂（如"四君子汤"）\n🏥 中医理论（如"什么是阴阳五行"）\n🩺 病症解析（如"感冒的中医治法"）\n试试吧！';
+            }
+
+            // ====== Layer 2: 名著详情 ======
+            for (var key in famousBooks) {
+                if (text.indexOf(key) !== -1 || key.indexOf(text) !== -1) {
+                    var bk = findBookInData(key);
+                    var extra = '';
+                    if (bk) {
+                        extra = '\n📖 本站编号：' + String(bk.num).padStart(3, '0') + '，分类：' + getCategoryName(bk.name);
+                    }
+                    return '📖 《' + key + '》\n' + famousBooks[key] + extra;
+                }
+            }
+
+            // ====== Layer 3: 书籍模糊匹配 ======
+            var searchTerm = text.replace(/介绍|什么是|有没有|什么叫|是什么|查阅|查|找|讲|说说|说明/g, '');
+            if (searchTerm.length >= 2) {
+                var found = searchBook(searchTerm);
+                if (found.length >= 1 && found.length <= 5) {
+                    return '找到相关古籍：\n' + found.map(function(b) {
+                        return '📗 《' + b.name + '》（编号' + String(b.num).padStart(3, '0') + '，' + getCategoryName(b.name) + '类）';
+                    }).join('\n');
+                } else if (found.length > 5) {
+                    var samples = found.slice(0, 5).map(function(b) { return '《' + b.name + '》（' + getCategoryName(b.name) + '）'; }).join('、');
+                    return '找到 ' + found.length + ' 部相关古籍，前5部：\n' + samples + '\n建议使用页面顶部搜索框或分类筛选精确查找。';
+                }
+            }
+
+            // ====== Layer 4: 类别查询 ======
+            for (var cat in catInfo) {
+                if (text.indexOf(cat) !== -1) {
+                    // 检查是否是数量问题
+                    if (/(多少|几本|数量|多少部|几个|一共)/.test(text)) {
+                        return '📂 「' + cat + '」类本站共收录 ' + catInfo[cat].count + ' 部古籍。';
+                    }
+                    // 检查是否要列出
+                    if (/(有哪些|什么|列出|推荐|介绍|有什么)/.test(text)) {
+                        var catBooks = getBooksByCategory(cat);
+                        var preview = catBooks.slice(0, 8).join('、');
+                        var more = catBooks.length > 8 ? '\n……等共 ' + catBooks.length + ' 部。' : '';
+                        return '📂 「' + cat + '」类（' + catInfo[cat].count + '部）\n' + catInfo[cat].desc + '\n\n部分书目：' + preview + more;
+                    }
+                    return '📂 「' + cat + '」类\n' + catInfo[cat].desc + '\n共有 ' + catInfo[cat].count + ' 部古籍。输入"' + cat + '类有哪些"查看详细书目。';
+                }
+            }
+
+            // ====== Layer 5: 总量统计 ======
+            if (/(多少|几本|数量|总共|一共|总数|统计)/.test(text) && /(古籍|本书|本站|典藏)/.test(text)) {
+                var cats = Object.keys(catInfo);
+                var total = 0;
+                var detail = [];
+                for (var i = 0; i < cats.length; i++) {
+                    var c = catInfo[cats[i]];
+                    total += c.count;
+                    detail.push('• ' + cats[i] + '：' + c.count + '部');
+                }
+                return '📊 本站共收录中医药古籍 ' + total + ' 部，涵盖 ' + cats.length + ' 大门类：\n' + detail.join('\n');
+            }
+
+            // ====== Layer 6: 中医理论 ======
+            for (var t in theoryDB) {
+                if (text.indexOf(t) !== -1 || (t.length >= 3 && text.indexOf(t.substring(0, 2)) !== -1)) {
+                    return '📚 「' + t + '」\n' + theoryDB[t];
+                }
+            }
+
+            // ====== Layer 7: 中药 ======
+            for (var h in herbDB) {
+                if (text.indexOf(h) !== -1) {
+                    return '🌿 「' + h + '」\n' + herbDB[h];
+                }
+            }
+
+            // ====== Layer 8: 方剂 ======
+            for (var f in formulaDB) {
+                if (text.indexOf(f) !== -1) {
+                    return '🧪 「' + f + '」\n' + formulaDB[f];
+                }
+            }
+
+            // ====== Layer 9: 病症 ======
+            for (var d in conditionDB) {
+                if (text.indexOf(d) !== -1) {
+                    return '🩺 「' + d + '」的中医解析\n' + conditionDB[d];
+                }
+            }
+
+            // ====== Layer 10: 上下文关联 ======
+            if (chatHistory.length > 0) {
+                var lastQ = chatHistory[chatHistory.length - 1];
+                if (lastQ.role === 'bot' && /还有|更多|接着|继续/i.test(text)) {
+                    return '请具体告诉我你想继续了解哪个方面的内容？比如"更多本草类"或者"还有其他方剂吗"。';
+                }
+            }
+
+            // ====== Layer 11: 上下文中的追问 ======
+            // 检查上一条用户消息
+            if (chatHistory.length >= 2) {
+                var prevUser = '';
+                for (var i = chatHistory.length - 1; i >= 0; i--) {
+                    if (chatHistory[i].role === 'user') { prevUser = chatHistory[i].text; break; }
+                }
+                if (/(还有|还有哪些|更多|其他的|列举)/i.test(text)) {
+                    for (var cc in catInfo) {
+                        if (prevUser.indexOf(cc) !== -1) {
+                            var cb2 = getBooksByCategory(cc);
+                            return '更多「' + cc + '」类古籍：\n' + cb2.slice(0, 15).join('、') + (cb2.length > 15 ? '\n……共' + cb2.length + '部。' : '');
+                        }
+                    }
+                    return '你想了解哪个分类的更多内容？请具体说（如"更多本草类"）。';
+                }
+            }
+
+            // ====== 默认 ======
+            return pick([
+                '好问题！你可以试试：\n🔍 在搜索框输入书名\n📂 点击分类按钮浏览\n💬 问我"本草类有哪些"\n💊 问我"人参的功效"\n🧪 问我"四君子汤"\n📚 输入"帮助"看所有功能',
+                '这个问题挺有意思的~ 本站有 ' + booksData.length + ' 部古籍，12大门类。你可以按分类浏览或直接搜索书名。',
+                '输入"帮助"查看我能回答哪些问题~\n也可以直接问我："介绍《伤寒论》"、"针灸类有哪些"、"什么是经络"等。'
+            ]);
+        }
+
+        function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function findBookInData(name) {
+            for (var i = 0; i < booksData.length; i++) {
+                if (booksData[i].name === name) return booksData[i];
+            }
+            return null;
+        }
+
+        function addToHistory(role, text) {
+            chatHistory.push({ role: role, text: text });
+            if (chatHistory.length > MAX_HISTORY) chatHistory.shift();
+        }
+
+        // 动态建议
         function showSuggestions() {
             var container = document.getElementById('chatbotSuggestions');
-            container.innerHTML = suggestQuestions.map(function(q) {
+            var shuffled = allSuggestions.slice().sort(function() { return Math.random() - 0.5; });
+            var picks = shuffled.slice(0, 6);
+            container.innerHTML = picks.map(function(q) {
                 return '<button onclick="useSuggestion(\'' + q.replace(/'/g, "\\'") + '\')">' + q + '</button>';
             }).join('');
         }
@@ -2995,18 +3212,6 @@
         function useSuggestion(text) {
             document.getElementById('chatbotInput').value = text;
             sendChatbotMsg();
-        }
-
-        // 切换面板
-        function toggleChatbot() {
-            var panel = document.getElementById('chatbotPanel');
-            var isOpen = panel.classList.toggle('open');
-            if (isOpen) {
-                document.getElementById('chatbotInput').focus();
-                // 滚动到底部
-                var msgs = document.getElementById('chatbotMessages');
-                msgs.scrollTop = msgs.scrollHeight;
-            }
         }
 
         // 查找古籍
@@ -3021,82 +3226,54 @@
             return results;
         }
 
-        // 获取类别下的书籍列表摘要
+        // 获取类别下书籍列表
         function getBooksByCategory(catName) {
             var names = [];
             for (var i = 0; i < booksData.length; i++) {
-                var cat = getCategoryName(booksData[i].name);
-                if (cat === catName) {
+                if (getCategoryName(booksData[i].name) === catName) {
                     names.push(booksData[i].name);
                 }
             }
             return names;
         }
 
-        // 主要回答逻辑
-        function getBotReply(input) {
-            var text = input.replace(/[《》「」『』\s？?，,。.!！、：:]/g, '').trim();
-            if (!text) return '请说点什么吧~';
-
-            // 1. 精确匹配知识库
-            for (var key in botKnowledge) {
-                if (text.indexOf(key) !== -1) {
-                    var replies = botKnowledge[key];
-                    return replies[Math.floor(Math.random() * replies.length)];
-                }
+        // 切换面板
+        function toggleChatbot() {
+            var panel = document.getElementById('chatbotPanel');
+            var isOpen = panel.classList.toggle('open');
+            if (isOpen) {
+                document.getElementById('chatbotInput').focus();
+                var msgs = document.getElementById('chatbotMessages');
+                msgs.scrollTop = msgs.scrollHeight;
+                refreshSuggestions();
             }
-
-            // 2. 模糊匹配书籍名称
-            for (var i = 0; i < bookNameIndex.length; i++) {
-                if (text.indexOf(bookNameIndex[i]) !== -1 || bookNameIndex[i].indexOf(text) !== -1) {
-                    var book = booksData[i];
-                    var cat = getCategoryName(book.name);
-                    return '《' + book.name + '》编号 ' + String(book.num).padStart(3, '0') + '，属于「' + cat + '」类。你可以点击上方的分类筛选，或使用搜索功能查找。';
-                }
-            }
-
-            // 3. 关于数量的特殊回应
-            if (text.indexOf('多少') !== -1 || text.indexOf('几本') !== -1 || text.indexOf('数量') !== -1) {
-                var cat = '';
-                for (var c in {'本草':1,'伤寒':1,'金匮':1,'内经':1,'方书':1,'女科':1,'儿科':1,'外科':1,'针灸':1,'眼科':1,'医案':1,'医论':1}) {
-                    if (text.indexOf(c) !== -1) { cat = c; break; }
-                }
-                if (cat && botKnowledge[cat]) {
-                    return botKnowledge[cat][0];
-                }
-                return '本站共收录中医药古籍 ' + booksData.length + ' 部，涵盖12大门类。';
-            }
-
-            // 4. 搜索书籍
-            if (text.indexOf('找') !== -1 || text.indexOf('搜索') !== -1 || text.indexOf('查') !== -1) {
-                var searchTerm = text.replace(/找|搜索|查|一下|看看/g, '').trim();
-                if (searchTerm) {
-                    var found = searchBook(searchTerm);
-                    if (found.length > 0) {
-                        var list = found.map(function(b) { return '《' + b.name + '》'; }).join('、');
-                        return '找到了 ' + found.length + ' 部相关古籍：' + list;
-                    } else {
-                        return '没有找到包含「' + searchTerm + '」的古籍，试试换个关键词？';
-                    }
-                }
-            }
-
-            // 5. 默认回复
-            var defaultReplies = [
-                '好问题！你可以试试在搜索框中输入关键词查找相关古籍。',
-                '这涉及中医的深邃领域，本站有701部古籍可供参考。',
-                '你可以问我某个具体分类（如"本草类"）或某本古籍的名字。',
-                '输入「帮助」查看我可以回答哪些问题~',
-                '🔍 在页面顶部搜索框可以直接搜索古籍名称。'
-            ];
-            return defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
         }
 
-        // OpenClaw AI 聊天 API
-        // 本地开发: http://127.0.0.1:3456/api/chat
-        // 生产: cloudflared 隧道地址
+        function refreshSuggestions() {
+            showSuggestions();
+        }
 
-        // 发送消息到 OpenClaw AI
+        // 更新模式指示器
+        function setChatMode(mode) {
+            chatMode = mode;
+            var badge = document.getElementById('chatModeBadge');
+            if (!badge) return;
+            if (mode === 'api') {
+                badge.textContent = '✨ AI';
+                badge.style.background = 'rgba(100, 200, 100, 0.25)';
+                badge.style.color = '#8FDC8F';
+            } else if (mode === 'local') {
+                badge.textContent = '📚 本地';
+                badge.style.background = 'rgba(200, 160, 100, 0.25)';
+                badge.style.color = '#D4A574';
+            } else {
+                badge.textContent = '⚡ 离线';
+                badge.style.background = 'rgba(200, 100, 100, 0.25)';
+                badge.style.color = '#D48787';
+            }
+        }
+
+        // ===== 核心：发送消息（双模） =====
         function sendChatbotMsg() {
             var input = document.getElementById('chatbotInput');
             var text = input.value.trim();
@@ -3104,42 +3281,60 @@
 
             var msgsDiv = document.getElementById('chatbotMessages');
 
-            // 显示用户消息
+            // 用户消息
             msgsDiv.innerHTML += '<div class="chatbot-msg user">' + escapeHtml(text) + '</div>';
             input.value = '';
             msgsDiv.scrollTop = msgsDiv.scrollHeight;
 
-            // 显示打字指示
+            // 打字指示
             msgsDiv.innerHTML += '<div class="chatbot-msg typing" id="typingIndicator"><span></span><span></span><span></span></div>';
             msgsDiv.scrollTop = msgsDiv.scrollHeight;
 
-            // 发送请求
-            try {
-                fetch('http://127.0.0.1:3456/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                }).then(function(response) {
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
-                    }
-                    return readSSEStream(response);
-                }).then(function(fullText) {
-                    removeTyping();
-                    if (fullText) {
-                        appendBotMsg(fullText);
-                    }
-                }).catch(function(err) {
-                    removeTyping();
-                    appendBotMsg('抱歉，AI 助手暂时无法连接。<br><small>错误：' + escapeHtml(err.message) + '</small>');
-                });
-            } catch (e) {
+            // 尝试 AI API
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function() { controller.abort(); }, AI_TIMEOUT);
+
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text }),
+                signal: controller.signal
+            }).then(function(response) {
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return readSSEStream(response);
+            }).then(function(fullText) {
                 removeTyping();
-                appendBotMsg('抱歉，发送失败。');
+                if (fullText) {
+                    setChatMode('api');
+                    appendBotMsg(fullText);
+                    addToHistory('bot', fullText);
+                } else {
+                    // API 返回空，降级本地
+                    fallbackLocal(text, msgsDiv);
+                }
+            }).catch(function(err) {
+                clearTimeout(timeoutId);
+                removeTyping();
+                // API 不可用，降级本地知识库
+                fallbackLocal(text, msgsDiv);
+            });
+        }
+
+        function fallbackLocal(text, msgsDiv) {
+            setChatMode('local');
+            var reply = getBotReply(text);
+            if (reply) {
+                // 模拟打字延迟
+                var delay = Math.min(reply.length * 15, 800);
+                setTimeout(function() {
+                    appendBotMsg(reply);
+                    addToHistory('bot', reply);
+                }, delay);
             }
         }
 
-        // 读取 SSE 流
+        // SSE 流读取
         function readSSEStream(response) {
             var reader = response.body.getReader();
             var decoder = new TextDecoder();
@@ -3150,9 +3345,8 @@
                 return reader.read().then(function(result) {
                     if (result.done) return fullText;
                     buffer += decoder.decode(result.value, { stream: true });
-                    // 解析 SSE 行
                     var lines = buffer.split('\n');
-                    buffer = lines.pop() || '';  // 最后一行可能不完整
+                    buffer = lines.pop() || '';
                     for (var i = 0; i < lines.length; i++) {
                         var line = lines[i];
                         if (line.startsWith('data: ')) {
@@ -3170,14 +3364,12 @@
                             } catch(e) {}
                         }
                     }
-                    return process();  // 继续读取
+                    return process();
                 });
             }
-
             return process();
         }
 
-        // 实时更新流式文本
         function updateStreamingText(text) {
             removeTyping();
             var msgsDiv = document.getElementById('chatbotMessages');
@@ -3190,7 +3382,6 @@
             msgsDiv.scrollTop = msgsDiv.scrollHeight;
         }
 
-        // 添加完整的机器人回复
         function appendBotMsg(text) {
             var msgsDiv = document.getElementById('chatbotMessages');
             var streaming = document.getElementById('streamingMsg');
@@ -3199,11 +3390,20 @@
             msgsDiv.scrollTop = msgsDiv.scrollHeight;
         }
 
-        // 移除打字指示器
         function removeTyping() {
             var typing = document.getElementById('typingIndicator');
             if (typing) typing.remove();
         }
+
+        // ESC 关闭面板
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                var panel = document.getElementById('chatbotPanel');
+                if (panel.classList.contains('open')) {
+                    panel.classList.remove('open');
+                }
+            }
+        });
     </script>
 
     <!-- Chatbot Widget -->
@@ -3214,7 +3414,7 @@
 
     <div class="chatbot-panel" id="chatbotPanel">
         <div class="chatbot-header">
-            <div class="chatbot-header-title">📖 线上小助手</div>
+            <div class="chatbot-header-title">📖 线上小助手 <span class="chatbot-mode-badge" id="chatModeBadge">✨ AI</span></div>
             <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
         </div>
         <div class="chatbot-messages" id="chatbotMessages">
